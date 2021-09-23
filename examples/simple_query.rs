@@ -1,5 +1,7 @@
 use std::process::exit;
 
+use prost::Message;
+use prost_types::Any;
 use tonic::metadata::AsciiMetadataValue;
 
 use stargate_grpc::stargate_client::*;
@@ -36,9 +38,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let stargate_grpc::response::Result::ResultSet(payload) =
         response.get_ref().result.as_ref().unwrap()
     {
-        // TODO: Unpack data
-        let data = payload.data.as_ref().unwrap();
-        println!("Got data: {:?}", data);
+        let data: &Any = payload.data.as_ref().unwrap();
+        let result_set: ResultSet = ResultSet::decode(data.value.as_slice())?;
+        for row in result_set.rows {
+            eprintln!("Got row: {:?}", row);
+        }
     }
     Ok(())
 }

@@ -38,9 +38,10 @@
 6. Run the example:
 
 
-        cargo run --example simple_query
+       cargo run --example simple_query
 
-        Connected to Stargate
-        Received response: Response { metadata: MetadataMap { headers: {"content-type": "application/grpc", "grpc-encoding": "identity", "grpc-accept-encoding": "gzip", "grpc-status": "0"} }, message: Response { warnings: [], traces: None, result: Some(ResultSet(Payload { r#type: Cql, data: Some(Any { type_url: "type.googleapis.com/stargate.ResultSet", value: [10, 8, 10, 2, 8, 2, 18, 2, 112, 107, 10, 11, 10, 2, 8, 13, 18, 5, 118, 97, 108, 117, 101, 18, 11, 10, 2, 24, 4, 10, 5, 58, 3, 98, 97, 114, 18, 11, 10, 2, 24, 2, 10, 5, 58, 3, 102, 111, 111] }) })) }, extensions: Extensions }
-        Got data: Any { type_url: "type.googleapis.com/stargate.ResultSet", value: [10, 8, 10, 2, 8, 2, 18, 2, 112, 107, 10, 11, 10, 2, 8, 13, 18, 5, 118, 97, 108, 117, 101, 18, 11, 10, 2, 24, 4, 10, 5, 58, 3, 98, 97, 114, 18, 11, 10, 2, 24, 2, 10, 5, 58, 3, 102, 111, 111] }
-
+       Connected to Stargate
+       Received response: Response { metadata: MetadataMap { headers: {"content-type": "application/grpc", "grpc-encoding": "identity", "grpc-accept-encoding": "gzip", "grpc-status": "0"} }, message: Response { warnings: [], traces: None, result: Some(ResultSet(Payload { r#type: Cql, data: Some(Any { type_url: "type.googleapis.com/stargate.ResultSet", value: [10, 8, 10, 2, 8, 2, 18, 2, 112, 107, 10, 11, 10, 2, 8, 13, 18, 5, 118, 97, 108, 117, 101, 18, 11, 10, 2, 24, 4, 10, 5, 58, 3, 98, 97, 114, 18, 11, 10, 2, 24, 2, 10, 5, 58, 3, 102, 111, 111] }) })) }, extensions: Extensions }
+       Got row: Row { values: [Value { inner: Some(Int(2)) }, Value { inner: Some(String("bar")) }] }
+       Got row: Row { values: [Value { inner: Some(Int(1)) }, Value { inner: Some(String("foo")) }] }
+    
