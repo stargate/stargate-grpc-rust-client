@@ -18,11 +18,11 @@
 
 3. Create a table `test.foo` and insert some data:
 
-       CREATE TABLE test.foo(pk bigint primary key, value varchar);
-       INSERT INTO test.foo(pk, value) values (1, 'foo');
-       INSERT INTO test.foo(pk, value) values (2, 'bar'); 
+       CREATE TABLE test.users(id bigint primary key, login varchar, emails list<varchar>);
+       INSERT INTO test.users(id, login, emails) values (1, 'one', ['one@example.net']);
+       INSERT INTO test.users(id, login, emails) values (2, 'two', ['2@example.net', 'two@example.net']); 
 
-5. Fetch the authentication token and store it in the `SG_TOKEN` environment variable:
+4. Fetch the authentication token and store it in the `SG_TOKEN` environment variable:
 
        curl -L -X POST 'http://127.0.0.2:8081/v1/auth' \
             -H 'Content-Type: application/json' \
@@ -35,13 +35,9 @@
  
        export SG_TOKEN=2df7e75d-92aa-4cda-9816-f96ccbc91d80
 
-6. Run the example:
+5. Run the example:
 
-
-       cargo run --example simple_query
-
-       Connected to Stargate
-       Received response: Response { metadata: MetadataMap { headers: {"content-type": "application/grpc", "grpc-encoding": "identity", "grpc-accept-encoding": "gzip", "grpc-status": "0"} }, message: Response { warnings: [], traces: None, result: Some(ResultSet(Payload { r#type: Cql, data: Some(Any { type_url: "type.googleapis.com/stargate.ResultSet", value: [10, 8, 10, 2, 8, 2, 18, 2, 112, 107, 10, 11, 10, 2, 8, 13, 18, 5, 118, 97, 108, 117, 101, 18, 11, 10, 2, 24, 4, 10, 5, 58, 3, 98, 97, 114, 18, 11, 10, 2, 24, 2, 10, 5, 58, 3, 102, 111, 111] }) })) }, extensions: Extensions }
-       Got row: Row { values: [Value { inner: Some(Int(2)) }, Value { inner: Some(String("bar")) }] }
-       Got row: Row { values: [Value { inner: Some(Int(1)) }, Value { inner: Some(String("foo")) }] }
+       cargo run --example simple_query http://127.0.0.2:8090
+       2 two ["2@example.net", "two@example.net"]
+       1 one ["one@example.net"]
     
