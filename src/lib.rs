@@ -49,12 +49,12 @@ impl Display for ConversionError {
 /// Instead we selectively generate `TryFrom` implementations from `ConvertFromValue`
 /// using dedicated `gen_try_from` macros.
 pub trait ConvertFromValue: Sized {
-    fn convert_from(value: Value) -> Result<Self, ConversionError>;
+    fn try_from(value: Value) -> Result<Self, ConversionError>;
 }
 
 impl Value {
-    fn convert_into<T: ConvertFromValue>(self) -> Result<T, ConversionError> {
-        T::convert_from(self)
+    fn try_into<T: ConvertFromValue>(self) -> Result<T, ConversionError> {
+        T::try_from(self)
     }
 }
 
@@ -67,7 +67,7 @@ macro_rules! gen_try_from_for {
         impl TryFrom<Value> for $T {
             type Error = ConversionError;
             fn try_from(value: Value) -> Result<Self, Self::Error> {
-                value.convert_into()
+                value.try_into()
             }
         }
     };
@@ -85,7 +85,7 @@ macro_rules! gen_try_from_for_generic {
         {
             type Error = ConversionError;
             fn try_from(value: Value) -> Result<Self, Self::Error> {
-                value.convert_into()
+                value.try_into()
             }
         }
     };
@@ -96,7 +96,7 @@ macro_rules! gen_convert_primitive_type {
     ($T:ty; $( $from:pat_param => $to:expr ),+) => {
 
         impl ConvertFromValue for $T {
-            fn convert_from(value: Value) -> Result<Self, ConversionError> {
+            fn try_from(value: Value) -> Result<Self, ConversionError> {
                 match value.inner {
                     $(Some($from) => Ok($to)),+,
                     other => Err(ConversionError::new::<Self, _>(other)),
@@ -140,13 +140,13 @@ macro_rules! gen_convert_tuple {
         impl<$($T),+> ConvertFromValue for ($($T),+)
         where $($T: ConvertFromValue),+
         {
-            fn convert_from(value: Value) -> Result<Self, ConversionError> {
+            fn try_from(value: Value) -> Result<Self, ConversionError> {
                 match value.inner {
                     // if the size doesn't match, we just bail out in the `other` case
                     Some(value::Inner::Collection(c)) if c.elements.len() == count!($($T)+) => {
                         let mut i = c.elements.into_iter();
                         Ok((
-                            $({ let x: $T = i.next().unwrap().convert_into()?; x }),+
+                            $({ let x: $T = i.next().unwrap().try_into()?; x }),+
                         ))
                     }
                     other => Err(ConversionError::new::<Self, _>(other)),
@@ -179,7 +179,7 @@ gen_convert_all_tuples!(A16, A15, A14, A13, A12, A11, A10, A9, A8, A7, A6, A5, A
 /// into a `Vec<Value>` without converting the elements of the collection. You may want to
 /// leave the elements unconverted, if they are of different types (heterogeneous collection).
 impl ConvertFromValue for Value {
-    fn convert_from(value: Value) -> Result<Self, ConversionError> {
+    fn try_from(value: Value) -> Result<Self, ConversionError> {
         Ok(value)
     }
 }
@@ -190,12 +190,12 @@ impl<T> ConvertFromValue for Option<T>
 where
     T: ConvertFromValue,
 {
-    fn convert_from(value: Value) -> Result<Self, ConversionError> {
+    fn try_from(value: Value) -> Result<Self, ConversionError> {
         match &value.inner {
             None => Ok(None),
             Some(value::Inner::Null(_)) => Ok(None),
             Some(value::Inner::Unset(_)) => Ok(None),
-            Some(_) => Ok(Some(value.convert_into()?)),
+            Some(_) => Ok(Some(value.try_into()?)),
         }
     }
 }
@@ -207,12 +207,12 @@ impl<T> ConvertFromValue for Vec<T>
 where
     T: ConvertFromValue,
 {
-    fn convert_from(value: Value) -> Result<Self, ConversionError> {
+    fn try_from(value: Value) -> Result<Self, ConversionError> {
         match value.inner {
             Some(value::Inner::Collection(c)) => Ok(c
                 .elements
                 .into_iter()
-                .map(|e| e.convert_into())
+                .map(|e| e.try_into())
                 .try_collect()?),
             other => Err(ConversionError::new::<Self, _>(other)),
         }
@@ -239,13 +239,13 @@ where
     K: ConvertFromValue,
     V: ConvertFromValue,
 {
-    fn convert_from(value: Value) -> Result<Self, ConversionError> {
+    fn try_from(value: Value) -> Result<Self, ConversionError> {
         match value.inner {
             Some(value::Inner::Collection(c)) if c.elements.len() % 2 == 0 => {
                 let mut result = Vec::with_capacity(c.elements.len() / 2);
                 for (k, v) in c.elements.into_iter().tuples() {
-                    let k: K = k.convert_into()?;
-                    let v: V = v.convert_into()?;
+                    let k: K = k.try_into()?;
+                    let v: V = v.try_into()?;
                     result.push(KeyValue(k, v));
                 }
                 Ok(result)
@@ -262,8 +262,8 @@ where
     K: ConvertFromValue + Eq + Hash,
     V: ConvertFromValue,
 {
-    fn convert_from(value: Value) -> Result<Self, ConversionError> {
-        let pairs: Vec<KeyValue<K, V>> = value.convert_into()?;
+    fn try_from(value: Value) -> Result<Self, ConversionError> {
+        let pairs: Vec<KeyValue<K, V>> = value.try_into()?;
         let mut map = HashMap::with_capacity(pairs.len());
         map.extend(pairs.into_iter().map(|kv| kv.into_tuple()));
         Ok(map)
@@ -275,8 +275,8 @@ where
     K: ConvertFromValue + Ord,
     V: ConvertFromValue,
 {
-    fn convert_from(value: Value) -> Result<Self, ConversionError> {
-        let pairs: Vec<KeyValue<K, V>> = value.convert_into()?;
+    fn try_from(value: Value) -> Result<Self, ConversionError> {
+        let pairs: Vec<KeyValue<K, V>> = value.try_into()?;
         let mut map = BTreeMap::new();
         map.extend(pairs.into_iter().map(|kv| kv.into_tuple()));
         Ok(map)
@@ -475,7 +475,7 @@ mod test {
         let v = Value {
             inner: Some(Inner::Int(123)),
         };
-        assert!(v.convert_into::<String>().is_err());
+        assert!(v.try_into::<String>().is_err());
     }
 
     #[test]
@@ -491,7 +491,19 @@ mod test {
                 elements: vec![v1, v2],
             })),
         };
-        assert!(v.convert_into::<(i64, f32, f32, f32)>().is_err());
+        assert!(v.try_into::<(i64, f32, f32, f32)>().is_err());
+    }
+
+    #[test]
+    fn pass_as_try_into() {
+        fn into_i64<T: TryInto<i64>>(value: T) -> i64 {
+            value.try_into().unwrap_or(-1)
+        }
+
+        let v1 = Value {
+            inner: Some(Inner::Int(1)),
+        };
+        assert_eq!(1, into_i64(v1));
     }
 
 }
