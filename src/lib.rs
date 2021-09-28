@@ -52,9 +52,74 @@ pub trait ConvertFromValue: Sized {
     fn try_from(value: Value) -> Result<Self, ConversionError>;
 }
 
+#[rustfmt::skip]
 impl Value {
-    fn try_into<T: ConvertFromValue>(self) -> Result<T, ConversionError> {
+    pub fn try_into<T: ConvertFromValue>(self) -> Result<T, ConversionError> {
         T::try_from(self)
+    }
+
+    pub fn null() -> Value {
+        Value { inner: Some(value::Inner::Null(value::Null {})) }
+    }
+
+    pub fn unset() -> Value {
+        Value { inner: Some(value::Inner::Unset(value::Unset {})) }
+    }
+
+    pub fn boolean(value: bool) -> Value {
+        Value { inner: Some(value::Inner::Boolean(value)) }
+    }
+
+    pub fn int(value: i64) -> Value {
+        Value { inner: Some(value::Inner::Int(value)) }
+    }
+
+    pub fn float(value: f32) -> Value {
+        Value { inner: Some(value::Inner::Float(value)) }
+    }
+
+    pub fn double(value: f64) -> Value {
+        Value { inner: Some(value::Inner::Double(value)) }
+    }
+
+    pub fn date(value: u32) -> Value {
+        Value { inner: Some(value::Inner::Date(value)) }
+    }
+
+    pub fn time(value: u64) -> Value {
+        Value { inner: Some(value::Inner::Time(value)) }
+    }
+
+    pub fn uuid(value: Vec<u8>) -> Value {
+        Value { inner: Some(value::Inner::Uuid(Uuid { value })) }
+    }
+
+    pub fn inet(value: Vec<u8>) -> Value {
+        Value { inner: Some(value::Inner::Inet(Inet { value })) }
+    }
+
+    pub fn bytes(value: Vec<u8>) -> Value {
+        Value { inner: Some(value::Inner::Bytes(value)) }
+    }
+
+    pub fn varint(value: Vec<u8>) -> Value {
+        Value { inner: Some(value::Inner::Varint(Varint { value })) }
+    }
+
+    pub fn decimal(scale: u32, value: Vec<u8>) -> Value {
+        Value { inner: Some(value::Inner::Decimal(Decimal { scale, value })) }
+    }
+
+    pub fn string(value: String) -> Value {
+        Value { inner: Some(value::Inner::String(value)) }
+    }
+
+    pub fn collection(elements: Vec<Value>) -> Value {
+        Value { inner: Some(value::Inner::Collection(Collection{ elements })) }
+    }
+
+    pub fn udt(fields: HashMap<String, Value>) -> Value {
+        Value { inner: Some(value::Inner::Udt(UdtValue { fields })) }
     }
 }
 
@@ -209,11 +274,9 @@ where
 {
     fn try_from(value: Value) -> Result<Self, ConversionError> {
         match value.inner {
-            Some(value::Inner::Collection(c)) => Ok(c
-                .elements
-                .into_iter()
-                .map(|e| e.try_into())
-                .try_collect()?),
+            Some(value::Inner::Collection(c)) => {
+                Ok(c.elements.into_iter().map(|e| e.try_into()).try_collect()?)
+            }
             other => Err(ConversionError::new::<Self, _>(other)),
         }
     }
@@ -295,36 +358,27 @@ gen_try_from_for_generic!(<K: Ord, V> Option<BTreeMap<K, V>>);
 #[cfg(test)]
 mod test {
     use super::*;
-    use value::Inner;
 
     use std::convert::TryInto;
 
     #[test]
     fn convert_to_i64() {
-        let v = Value {
-            inner: Some(Inner::Int(123)),
-        };
+        let v = Value::int(123);
         let int: i64 = v.try_into().unwrap();
         assert_eq!(int, 123)
     }
 
     #[test]
     fn convert_to_string() {
-        let v = Value {
-            inner: Some(Inner::String("foo".to_string())),
-        };
+        let v = Value::string("foo".to_string());
         let s: String = v.try_into().unwrap();
         assert_eq!(s, "foo".to_string())
     }
 
     #[test]
     fn convert_to_option() {
-        let some = Value {
-            inner: Some(Inner::Int(123)),
-        };
-        let none = Value {
-            inner: Some(Inner::Null(value::Null {})),
-        };
+        let some = Value::int(123);
+        let none = Value::null();
 
         let some_int: Option<i64> = some.try_into().unwrap();
         let none_int: Option<i64> = none.try_into().unwrap();
@@ -334,115 +388,69 @@ mod test {
     }
 
     #[test]
-    fn convert_to_vec() {
-        let v1 = Value {
-            inner: Some(Inner::Int(1)),
-        };
-        let v2 = Value {
-            inner: Some(Inner::Int(2)),
-        };
-        let v = Value {
-            inner: Some(Inner::Collection(Collection {
-                elements: vec![v1.clone(), v2.clone()],
-            })),
-        };
+    fn convert_to_heterogeneous_vec() {
+        let v1 = Value::int(1);
+        let v2 = Value::int(2);
+        let v = Value::collection(vec![v1.clone(), v2.clone()]);
 
-        let vec1: Vec<Value> = v.clone().try_into().unwrap();
-        assert_eq!(vec1, vec![v1, v2]);
+        let vec: Vec<Value> = v.try_into().unwrap();
+        assert_eq!(vec, vec![v1, v2]);
+    }
 
-        let vec2: Vec<i64> = v.clone().try_into().unwrap();
-        assert_eq!(vec2, vec![1, 2]);
+    #[test]
+    fn convert_to_homogenous_vec() {
+        let v1 = Value::int(1);
+        let v2 = Value::int(2);
+        let v = Value::collection(vec![v1, v2]);
+
+        let vec: Vec<i64> = v.try_into().unwrap();
+        assert_eq!(vec, vec![1, 2]);
     }
 
     #[test]
     fn convert_to_vec_of_key_value() {
-        let v1 = Value {
-            inner: Some(Inner::Int(1)),
-        };
-        let v2 = Value {
-            inner: Some(Inner::Int(2)),
-        };
-        let v = Value {
-            inner: Some(Inner::Collection(Collection {
-                elements: vec![v1, v2],
-            })),
-        };
+        let v1 = Value::int(1);
+        let v2 = Value::int(2);
+        let v = Value::collection(vec![v1, v2]);
         let vec: Vec<KeyValue<i64, i64>> = v.try_into().unwrap();
         assert_eq!(vec, vec![KeyValue(1, 2)]);
     }
 
     #[test]
     fn convert_to_hash_map() {
-        let v1 = Value {
-            inner: Some(Inner::Int(1)),
-        };
-        let v2 = Value {
-            inner: Some(Inner::String("foo".to_string())),
-        };
-        let v = Value {
-            inner: Some(Inner::Collection(Collection {
-                elements: vec![v1, v2],
-            })),
-        };
+        let v1 = Value::int(1);
+        let v2 = Value::string("foo".to_string());
+        let v = Value::collection(vec![v1, v2]);
         let map: HashMap<i64, String> = v.try_into().unwrap();
         assert_eq!(map.get(&1), Some("foo".to_string()).as_ref());
     }
 
     #[test]
     fn convert_to_btree_map() {
-        let v1 = Value {
-            inner: Some(Inner::Int(1)),
-        };
-        let v2 = Value {
-            inner: Some(Inner::String("foo".to_string())),
-        };
-        let v = Value {
-            inner: Some(Inner::Collection(Collection {
-                elements: vec![v1, v2],
-            })),
-        };
+        let v1 = Value::int(1);
+        let v2 = Value::string("foo".to_string());
+        let v = Value::collection(vec![v1, v2]);
         let map: BTreeMap<i64, String> = v.try_into().unwrap();
         assert_eq!(map.get(&1), Some("foo".to_string()).as_ref());
     }
 
     #[test]
     fn convert_to_nested_collections() {
-        let key = Value {
-            inner: Some(Inner::String("foo".to_string())),
-        };
-        let v1 = Value {
-            inner: Some(Inner::Int(1)),
-        };
-        let v2 = Value {
-            inner: Some(Inner::Int(2)),
-        };
-        let list = Value {
-            inner: Some(Inner::Collection(Collection {
-                elements: vec![v1, v2],
-            })),
-        };
-        let v = Value {
-            inner: Some(Inner::Collection(Collection {
-                elements: vec![key, list],
-            })),
-        };
+        let key = Value::string("foo".to_string());
+        let v1 = Value::int(1);
+        let v2 = Value::int(2);
+        let list = Value::collection(vec![v1, v2]);
+        let v = Value::collection(vec![key, list]);
+
         let map: HashMap<String, Vec<i64>> = v.try_into().unwrap();
         assert_eq!(map.get(&"foo".to_string()), Some(vec![1, 2]).as_ref());
     }
 
     #[test]
     fn convert_to_tuples() {
-        let v1 = Value {
-            inner: Some(Inner::Int(1)),
-        };
-        let v2 = Value {
-            inner: Some(Inner::Float(2.5)),
-        };
-        let v = Value {
-            inner: Some(Inner::Collection(Collection {
-                elements: vec![v1, v2],
-            })),
-        };
+        let v1 = Value::int(1);
+        let v2 = Value::float(2.5);
+        let v = Value::collection(vec![v1, v2]);
         let (a, b): (i64, f32) = v.try_into().unwrap();
         assert_eq!(a, 1);
         assert_eq!(b, 2.5);
@@ -450,20 +458,11 @@ mod test {
 
     #[test]
     fn convert_to_triples() {
-        let v1 = Value {
-            inner: Some(Inner::Int(1)),
-        };
-        let v2 = Value {
-            inner: Some(Inner::Int(2)),
-        };
-        let v3 = Value {
-            inner: Some(Inner::Float(2.5)),
-        };
-        let v = Value {
-            inner: Some(Inner::Collection(Collection {
-                elements: vec![v1, v2, v3],
-            })),
-        };
+        let v1 = Value::int(1);
+        let v2 = Value::int(2);
+        let v3 = Value::float(2.5);
+        let v = Value::collection(vec![v1, v2, v3]);
+
         let (a, b, c): (i64, i64, f32) = v.try_into().unwrap();
         assert_eq!(a, 1);
         assert_eq!(b, 2);
@@ -472,25 +471,15 @@ mod test {
 
     #[test]
     fn unexpected_type() {
-        let v = Value {
-            inner: Some(Inner::Int(123)),
-        };
+        let v = Value::int(123);
         assert!(v.try_into::<String>().is_err());
     }
 
     #[test]
     fn unexpected_tuple_size() {
-        let v1 = Value {
-            inner: Some(Inner::Int(1)),
-        };
-        let v2 = Value {
-            inner: Some(Inner::Float(2.5)),
-        };
-        let v = Value {
-            inner: Some(Inner::Collection(Collection {
-                elements: vec![v1, v2],
-            })),
-        };
+        let v1 = Value::int(1);
+        let v2 = Value::float(2.5);
+        let v = Value::collection(vec![v1, v2]);
         assert!(v.try_into::<(i64, f32, f32, f32)>().is_err());
     }
 
@@ -500,10 +489,7 @@ mod test {
             value.try_into().unwrap_or(-1)
         }
 
-        let v1 = Value {
-            inner: Some(Inner::Int(1)),
-        };
+        let v1 = Value::int(1);
         assert_eq!(1, into_i64(v1));
     }
-
 }

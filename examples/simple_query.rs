@@ -1,5 +1,3 @@
-use std::convert::TryInto;
-
 use anyhow::anyhow;
 use prost::Message;
 use prost_types::Any;
