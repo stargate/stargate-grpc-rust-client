@@ -433,6 +433,9 @@ mod test {
 
     #[test]
     fn convert_string_into_value() {
+        let v: Value = "foo".into();
+        assert_eq!(v, Value::string("foo"));
+
         let v: Value = "foo".to_string().into();
         assert_eq!(v, Value::string("foo"));
     }
