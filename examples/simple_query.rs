@@ -1,10 +1,10 @@
+use std::convert::TryInto;
+
 use anyhow::anyhow;
-use prost::Message;
-use prost_types::Any;
 use tonic::metadata::AsciiMetadataValue;
 
-use stargate_grpc::stargate_client::*;
 use stargate_grpc::*;
+use stargate_grpc::stargate_client::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -30,28 +30,23 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let response = client.execute_query(request).await?;
+    let result_set: ResultSet = response.try_into()?;
 
-    if let stargate_grpc::response::Result::ResultSet(payload) =
-        response.get_ref().result.as_ref().unwrap()
-    {
-        let data: &Any = payload.data.as_ref().unwrap();
-        let result_set: ResultSet = ResultSet::decode(data.value.as_slice())?;
-        for row in result_set.rows {
-            let mut values = row.values.into_iter();
-            let id: i64 = values
-                .next()
-                .ok_or(anyhow!("Missing column: id"))?
-                .try_into()?;
-            let login: String = values
-                .next()
-                .ok_or(anyhow!("Missing column: login"))?
-                .try_into()?;
-            let emails: Vec<String> = values
-                .next()
-                .ok_or(anyhow!("Missing column: emails"))?
-                .try_into()?;
-            println!("{} {} {:?}", id, login, emails);
-        }
+    for row in result_set.rows {
+        let mut values = row.values.into_iter();
+        let id: i64 = values
+            .next()
+            .ok_or(anyhow!("Missing column: id"))?
+            .try_into()?;
+        let login: String = values
+            .next()
+            .ok_or(anyhow!("Missing column: login"))?
+            .try_into()?;
+        let emails: Vec<String> = values
+            .next()
+            .ok_or(anyhow!("Missing column: emails"))?
+            .try_into()?;
+        println!("{} {} {:?}", id, login, emails);
     }
     Ok(())
 }

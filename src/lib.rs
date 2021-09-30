@@ -1,10 +1,61 @@
+use std::convert::TryFrom;
+
+pub use from_value::*;
+pub use into_value::*;
+use prost::DecodeError;
+use std::fmt::{Debug, Display, Formatter};
+
 mod from_value;
 mod into_value;
 
 tonic::include_proto!("stargate");
 
-pub use from_value::*;
-pub use into_value::*;
+/// Error thrown when some data received from the wire could not be properly
+/// converted to a desired Rust type.
+#[derive(Clone, Debug)]
+pub struct ConversionError {
+    kind: ConversionErrorKind,
+    value: String,
+    rust_type_name: &'static str,
+}
+
+#[derive(Clone, Debug)]
+pub enum ConversionErrorKind {
+    /// When the converter didn't know how to convert one type to another because the conversion
+    /// hasn't been defined
+    NoRecipe,
+    /// When the converter attempted to decode a binary blob, but conversion failed due to
+    /// invalid data
+    GrpcDecodeError(DecodeError),
+}
+
+impl ConversionError {
+    fn no_recipe<T, V: Debug>(cql_value: V) -> ConversionError {
+        ConversionError {
+            kind: ConversionErrorKind::NoRecipe,
+            value: format!("{:?}", cql_value),
+            rust_type_name: std::any::type_name::<T>(),
+        }
+    }
+
+    fn decode_error<T, V: Debug>(cql_value: V, cause: DecodeError) -> ConversionError {
+        ConversionError {
+            kind: ConversionErrorKind::GrpcDecodeError(cause),
+            value: format!("{:?}", cql_value),
+            rust_type_name: std::any::type_name::<T>(),
+        }
+    }
+}
+
+impl Display for ConversionError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Cannot convert value {} to {}",
+            self.value, self.rust_type_name
+        )
+    }
+}
 
 /// Defines structs for describing the gRPC data types that user data passed inside `Value`
 /// should be converted into. These structs do not hold any data, they exist purely for
@@ -64,4 +115,21 @@ pub mod types {
     /// It is handy if we already have a `Value` in the structure to be converted, and we
     /// just want it to be passed-through.
     pub struct Any;
+}
+
+/// A handy conversion that let us get directly to the `ResultSet` returned by a query.
+impl TryFrom<tonic::Response<crate::Response>> for ResultSet {
+    type Error = ConversionError;
+
+    fn try_from(response: tonic::Response<Response>) -> Result<Self, Self::Error> {
+        match &response.get_ref().result {
+            Some(response::Result::ResultSet(payload)) => {
+                use prost::Message;
+                let data: &prost_types::Any = payload.data.as_ref().unwrap();
+                ResultSet::decode(data.value.as_slice())
+                    .map_err(|e| ConversionError::decode_error::<ResultSet, _>(response, e))
+            }
+            other => Err(ConversionError::no_recipe::<ResultSet, _>(other)),
+        }
+    }
 }

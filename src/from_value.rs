@@ -3,37 +3,12 @@
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 use std::error::Error;
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::Debug;
 use std::hash::Hash;
 
 use itertools::Itertools;
 
 use crate::*;
-
-#[derive(Clone, Debug)]
-pub struct ConversionError {
-    value: String,
-    rust_type_name: &'static str,
-}
-
-impl ConversionError {
-    fn new<T, V: Debug>(cql_value: V) -> ConversionError {
-        ConversionError {
-            value: format!("{:?}", cql_value),
-            rust_type_name: std::any::type_name::<T>(),
-        }
-    }
-}
-
-impl Display for ConversionError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Cannot convert value {} to {}",
-            self.value, self.rust_type_name
-        )
-    }
-}
 
 /// Converts a `Value` to a Rust type.
 ///
@@ -100,7 +75,7 @@ macro_rules! gen_conversion {
             fn try_from(value: Value) -> Result<Self, ConversionError> {
                 match value.inner {
                     $(Some($from) => Ok($to)),+,
-                    other => Err(ConversionError::new::<Self, _>(other)),
+                    other => Err(ConversionError::no_recipe::<Self, _>(other)),
                 }
             }
         }
@@ -148,7 +123,7 @@ macro_rules! gen_tuple_conversion {
                             $({ let x: $T = i.next().unwrap().try_into()?; x }),+
                         ))
                     }
-                    other => Err(ConversionError::new::<Self, _>(other)),
+                    other => Err(ConversionError::no_recipe::<Self, _>(other)),
                 }
             }
         }
@@ -211,7 +186,7 @@ where
             Some(value::Inner::Collection(c)) => {
                 Ok(c.elements.into_iter().map(|e| e.try_into()).try_collect()?)
             }
-            other => Err(ConversionError::new::<Self, _>(other)),
+            other => Err(ConversionError::no_recipe::<Self, _>(other)),
         }
     }
 }
@@ -247,7 +222,7 @@ where
                 }
                 Ok(result)
             }
-            other => Err(ConversionError::new::<Self, _>(other)),
+            other => Err(ConversionError::no_recipe::<Self, _>(other)),
         }
     }
 }
@@ -341,7 +316,13 @@ mod test {
     fn convert_value_to_decimal() {
         let v = Value::decimal(2, vec![1, 2]);
         let decimal: Decimal = v.try_into().unwrap();
-        assert_eq!(decimal, Decimal { scale: 2, value: vec![1, 2] })
+        assert_eq!(
+            decimal,
+            Decimal {
+                scale: 2,
+                value: vec![1, 2]
+            }
+        )
     }
 
     #[test]

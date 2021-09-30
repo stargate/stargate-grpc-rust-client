@@ -478,7 +478,9 @@ impl Value {
     }
 
     fn raw_udt(value: UdtValue) -> Value {
-        Value { inner: Some(value::Inner::Udt(value))}
+        Value {
+            inner: Some(value::Inner::Udt(value)),
+        }
     }
 }
 
@@ -786,14 +788,19 @@ mod test {
 
     #[test]
     fn convert_inet_into_value() {
-        let inet = Inet { value: vec![127, 0, 0, 1] };
+        let inet = Inet {
+            value: vec![127, 0, 0, 1],
+        };
         let v = Value::from(inet);
         assert_eq!(v, Value::inet(vec![127, 0, 0, 1]))
     }
 
     #[test]
     fn convert_decimal_into_value() {
-        let decimal = Decimal { scale: 2, value: vec![10, 0] };
+        let decimal = Decimal {
+            scale: 2,
+            value: vec![10, 0],
+        };
         let v = Value::from(decimal);
         assert_eq!(v, Value::decimal(2, vec![10, 0]))
     }
