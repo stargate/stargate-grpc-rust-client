@@ -5,7 +5,7 @@ use std::hash::Hash;
 
 use itertools::Itertools;
 
-use crate::types::{List, Map};
+use crate::types::{ConcreteType, List, Map};
 use crate::*;
 
 /// Selects the default Cassandra gRPC value type associated with a Rust type.
@@ -342,6 +342,16 @@ where
     }
 }
 
+/// When requested to convert a Rust type to a Value of type Any, just use the default conversion.
+impl<R> IntoValue<types::Any> for R
+where
+    R: Into<Value>,
+{
+    fn into_value(self) -> Value {
+        self.into()
+    }
+}
+
 /// Generates a conversion from Rust concrete type to given Cassandra type.
 ///
 /// # Parameters
@@ -402,11 +412,21 @@ macro_rules! gen_tuple_conversion {
             }
         }
 
+        impl <$($R),+> IntoValue<List<types::Any>> for ($($R),+)
+        where $($R: IntoValue<types::Any>),+
+        {
+            fn into_value(self) -> Value {
+                Value::list(vec![$(self.$index.into_value()),+])
+            }
+        }
+
         impl<$($R),+> DefaultCassandraType for ($($R),+)
         where $($R: DefaultCassandraType),+
         {
             type C = ($(<$R as DefaultCassandraType>::C),+);
         }
+
+
     }
 }
 
@@ -473,6 +493,7 @@ gen_tuple_conversion!(
 impl<R, C> IntoValue<C> for Option<R>
 where
     R: IntoValue<C>,
+    C: ConcreteType,
 {
     fn into_value(self) -> Value {
         match self {
@@ -548,8 +569,26 @@ where
 mod test {
     use std::collections::{BTreeMap, HashMap};
 
-    use crate::types::{Date, Int, List, Map, Time};
+    use crate::types::{Any, Date, Int, List, Map, Time};
     use crate::*;
+
+    #[test]
+    fn convert_value_into_value() {
+        let v: Value = Value::int(1).into();
+        assert_eq!(v, Value::int(1));
+    }
+
+    #[test]
+    fn convert_i64_into_any_using_of_type() {
+        let v: Value = Value::of_type(Any, 1);
+        assert_eq!(v, Value::int(1));
+    }
+
+    #[test]
+    fn convert_value_into_any_using_of_type() {
+        let v: Value = Value::of_type(Any, Value::int(1));
+        assert_eq!(v, Value::int(1))
+    }
 
     #[test]
     fn convert_i64_into_value() {
@@ -574,21 +613,28 @@ mod test {
     }
 
     #[test]
-    fn convert_tuple_to_default_value() {
+    fn convert_tuple_into_default_value() {
         let tuple = (1, "foo");
         let v = Value::from(tuple);
         assert_eq!(v, Value::list(vec![Value::int(1), Value::string("foo")]))
     }
 
     #[test]
-    fn convert_tuple_to_typed_value() {
+    fn convert_tuple_into_list_value_using_of_type() {
+        let tuple = (1, "foo");
+        let v = Value::of_type(List(Any), tuple);
+        assert_eq!(v, Value::list(vec![Value::int(1), Value::string("foo")]))
+    }
+
+    #[test]
+    fn convert_tuple_into_typed_value() {
         let tuple = (1, 100);
         let v = Value::of_type((Int, Time), tuple);
         assert_eq!(v, Value::list(vec![Value::int(1), Value::time(100)]))
     }
 
     #[test]
-    fn convert_large_tuple_to_value() {
+    fn convert_large_tuple_into_value() {
         let tuple = (1, 2, 3, 4, 5, "foo");
         let v = Value::from(tuple);
         match v.inner {
@@ -606,6 +652,15 @@ mod test {
         let none: Option<i64> = None;
         let none_value: Value = none.into();
         assert_eq!(Value::null(), none_value);
+    }
+
+    #[test]
+    fn convert_option_into_any_using_of_type() {
+        let v: Value = Value::of_type(Any, Some(1));
+        assert_eq!(v, Value::int(1));
+
+        let v: Value = Value::of_type(Any, None as Option<i32>);
+        assert_eq!(v, Value::null());
     }
 
     #[test]
