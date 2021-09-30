@@ -5,8 +5,8 @@ use std::hash::Hash;
 
 use itertools::Itertools;
 
-use crate::*;
 use crate::types::{List, Map};
+use crate::*;
 
 /// Selects the default Cassandra gRPC value type associated with a Rust type.
 /// The default type is used when a Rust value `x` is converted to `Value` by calling
@@ -17,21 +17,22 @@ use crate::types::{List, Map};
 ///
 /// # Default type mapping
 ///
-/// | Rust type        | gRPC type   |
-/// |------------------|-------------|
-/// | `i8`             | `Int`       |
-/// | `i16`            | `Int`       |
-/// | `i32`            | `Int`       |
-/// | `i64`            | `Int`       |
-/// | `f32`            | `Float`     |
-/// | `f64`            | `Double`    |
-/// | `bool`           | `Boolean`   |
-/// | `String`         | `String`    |
-/// | `Vec<u8>`        | `Bytes`     |
-/// | `Vec<T>`         | `List`      |
-/// | `Vec<KeyValue>`  | `Map`       |
-/// | `HashMap<K, V>`  | `Map`       |
-/// | `BTreeMap<K, V>` | `Map`       |
+/// | Rust type        | gRPC type       |
+/// |------------------|-----------------|
+/// | `i8`             | `Int`           |
+/// | `i16`            | `Int`           |
+/// | `i32`            | `Int`           |
+/// | `i64`            | `Int`           |
+/// | `f32`            | `Float`         |
+/// | `f64`            | `Double`        |
+/// | `bool`           | `Boolean`       |
+/// | `String`         | `String`        |
+/// | `Vec<u8>`        | `Bytes`         |
+/// | `Vec<T>`         | `List`          |
+/// | `Vec<KeyValue>`  | `Map`           |
+/// | `HashMap<K, V>`  | `Map`           |
+/// | `BTreeMap<K, V>` | `Map            |
+/// | `(T1, T2, ...)`  | `List`          |
 ///
 /// # Example
 /// ```
@@ -136,9 +137,7 @@ pub trait IntoValue<C> {
     fn into_value(self) -> Value;
 }
 
-#[rustfmt::skip]
 impl Value {
-
     fn convert<R: IntoValue<C>, C>(value: R) -> Value {
         value.into_value()
     }
@@ -164,7 +163,9 @@ impl Value {
 
     /// Creates a Cassandra Null value.
     pub fn null() -> Value {
-        Value { inner: Some(value::Inner::Null(value::Null {})) }
+        Value {
+            inner: Some(value::Inner::Null(value::Null {})),
+        }
     }
 
     /// Unset value. Unset query parameter values are ignored by the server.
@@ -173,55 +174,81 @@ impl Value {
     /// but you don't want to change the target value stored in the database.
     /// To be used only for bind values in queries.
     pub fn unset() -> Value {
-        Value { inner: Some(value::Inner::Unset(value::Unset {})) }
+        Value {
+            inner: Some(value::Inner::Unset(value::Unset {})),
+        }
     }
 
     pub fn boolean(value: bool) -> Value {
-        Value { inner: Some(value::Inner::Boolean(value)) }
+        Value {
+            inner: Some(value::Inner::Boolean(value)),
+        }
     }
 
     pub fn int(value: i64) -> Value {
-        Value { inner: Some(value::Inner::Int(value)) }
+        Value {
+            inner: Some(value::Inner::Int(value)),
+        }
     }
 
     pub fn float(value: f32) -> Value {
-        Value { inner: Some(value::Inner::Float(value)) }
+        Value {
+            inner: Some(value::Inner::Float(value)),
+        }
     }
 
     pub fn double(value: f64) -> Value {
-        Value { inner: Some(value::Inner::Double(value)) }
+        Value {
+            inner: Some(value::Inner::Double(value)),
+        }
     }
 
     pub fn date(value: u32) -> Value {
-        Value { inner: Some(value::Inner::Date(value)) }
+        Value {
+            inner: Some(value::Inner::Date(value)),
+        }
     }
 
     pub fn time(value: u64) -> Value {
-        Value { inner: Some(value::Inner::Time(value)) }
+        Value {
+            inner: Some(value::Inner::Time(value)),
+        }
     }
 
     pub fn uuid(value: Vec<u8>) -> Value {
-        Value { inner: Some(value::Inner::Uuid(Uuid { value })) }
+        Value {
+            inner: Some(value::Inner::Uuid(Uuid { value })),
+        }
     }
 
     pub fn inet(value: Vec<u8>) -> Value {
-        Value { inner: Some(value::Inner::Inet(Inet { value })) }
+        Value {
+            inner: Some(value::Inner::Inet(Inet { value })),
+        }
     }
 
     pub fn bytes(value: Vec<u8>) -> Value {
-        Value { inner: Some(value::Inner::Bytes(value)) }
+        Value {
+            inner: Some(value::Inner::Bytes(value)),
+        }
     }
 
     pub fn varint(value: Vec<u8>) -> Value {
-        Value { inner: Some(value::Inner::Varint(Varint { value })) }
+        Value {
+            inner: Some(value::Inner::Varint(Varint { value })),
+        }
     }
 
     pub fn decimal(scale: u32, value: Vec<u8>) -> Value {
-        Value { inner: Some(value::Inner::Decimal(Decimal { scale, value })) }
+        Value {
+            inner: Some(value::Inner::Decimal(Decimal { scale, value })),
+        }
     }
 
     pub fn string<S: ToString>(value: S) -> Value {
-        Value { inner: Some(value::Inner::String(value.to_string())) }
+        Value {
+            inner: Some(value::Inner::String(value.to_string())),
+        }
     }
 
     /// Converts an iterable collection to a `Value` representing a list.
@@ -238,11 +265,13 @@ impl Value {
     /// ```
     pub fn list<I, T>(elements: I) -> Value
     where
-        I: IntoIterator<Item=T>,
-        T: Into<Value>
+        I: IntoIterator<Item = T>,
+        T: Into<Value>,
     {
         let elements = elements.into_iter().map(|e| e.into()).collect_vec();
-        Value { inner: Some(value::Inner::Collection(Collection{ elements })) }
+        Value {
+            inner: Some(value::Inner::Collection(Collection { elements })),
+        }
     }
 
     /// Converts a collection of key-value pairs to a `Value` representing a map.
@@ -271,7 +300,7 @@ impl Value {
     /// ```
     pub fn map<I, K, V>(elements: I) -> Value
     where
-        I: IntoIterator<Item=(K, V)>,
+        I: IntoIterator<Item = (K, V)>,
         K: Into<Value>,
         V: Into<Value>,
     {
@@ -282,19 +311,25 @@ impl Value {
             collection.push(k.into());
             collection.push(v.into());
         }
-        Value { inner: Some(value::Inner::Collection(Collection { elements: collection } )) }
+        Value {
+            inner: Some(value::Inner::Collection(Collection {
+                elements: collection,
+            })),
+        }
     }
 
     pub fn udt<K, V>(fields: HashMap<K, V>) -> Value
     where
         K: ToString,
-        V: Into<Value>
+        V: Into<Value>,
     {
         let fields = fields
             .into_iter()
             .map(|(k, v)| (k.to_string(), v.into()))
             .collect();
-        Value { inner: Some(value::Inner::Udt(UdtValue { fields })) }
+        Value {
+            inner: Some(value::Inner::Udt(UdtValue { fields })),
+        }
     }
 }
 
@@ -307,7 +342,13 @@ where
     }
 }
 
-/// Generates a `IntoValue` for given concrete Rust type.
+/// Generates a conversion from Rust concrete type to given Cassandra type.
+///
+/// # Parameters
+/// - `R`: Rust type
+/// - `C`: Cassandra gRPC data type (from `types`)
+/// - `from`: original Rust value before the conversion
+/// - `to`: expression yielding a `Value`
 macro_rules! gen_conversion {
     ($R:ty => $C:ty; $from:ident => $to:expr) => {
         impl IntoValue<$C> for $R {
@@ -343,6 +384,91 @@ gen_conversion!(&str => types::String; x => Value::string(x.to_string()));
 gen_conversion!(Vec<u8> => types::Bytes; x => Value::bytes(x));
 gen_conversion!(Vec<u8> => types::Inet; x => Value::inet(x));
 gen_conversion!(Vec<u8> => types::Varint; x => Value::varint(x));
+
+/// Generates generic conversion from a Rust tuple to `Value`.
+///
+/// # Parameters:
+/// - `index`: index of the tuple element, starts at 0
+/// - `R`: type variable used to denote Rust type
+/// - `C`: type variable used to denote Cassandra type
+macro_rules! gen_tuple_conversion {
+    ($($index:tt: $R:ident => $C:ident),+) => {
+
+        impl <$($R),+, $($C),+> IntoValue<($($C),+)> for ($($R),+)
+        where $($R: IntoValue<$C>),+
+        {
+            fn into_value(self) -> Value {
+                Value::list(vec![$(self.$index.into_value()),+])
+            }
+        }
+
+        impl<$($R),+> DefaultCassandraType for ($($R),+)
+        where $($R: DefaultCassandraType),+
+        {
+            type C = ($(<$R as DefaultCassandraType>::C),+);
+        }
+    }
+}
+
+// Unfortunately I haven't figured out how to do all prefixes recursively with declarative macros.
+// We could specify args in reversed order and generate all suffixes easily with one call,
+// but then this would force us to process tuples right-to-left and the result vector would
+// be also reversed (so additional reverse step would be needed in runtime to fix that).
+// Hence, a bit verbose, but works:
+gen_tuple_conversion!(
+    0: R0 => C0, 1: R1 => C1);
+gen_tuple_conversion!(
+    0: R0 => C0, 1: R1 => C1, 2: R2 => C2);
+gen_tuple_conversion!(
+    0: R0 => C0, 1: R1 => C1, 2: R2 => C2, 3: R3 => C3);
+gen_tuple_conversion!(
+    0: R0 => C0, 1: R1 => C1, 2: R2 => C2, 3: R3 => C3,
+    4: R4 => C4);
+gen_tuple_conversion!(
+    0: R0 => C0, 1: R1 => C1, 2: R2 => C2, 3: R3 => C3,
+    4: R4 => C4, 5: R5 => C5);
+gen_tuple_conversion!(
+    0: R0 => C0, 1: R1 => C1, 2: R2 => C2, 3: R3 => C3,
+    4: R4 => C4, 5: R5 => C5, 6: R6 => C6);
+gen_tuple_conversion!(
+    0: R0 => C0, 1: R1 => C1, 2: R2 => C2, 3: R3 => C3,
+    4: R4 => C4, 5: R5 => C5, 6: R6 => C6, 7: R7 => C7);
+gen_tuple_conversion!(
+    0: R0 => C0, 1: R1 => C1, 2: R2 => C2, 3: R3 => C3,
+    4: R4 => C4, 5: R5 => C5, 6: R6 => C6, 7: R7 => C7,
+    8: R8 => C8);
+gen_tuple_conversion!(
+    0: R0 => C0, 1: R1 => C1, 2: R2 => C2, 3: R3 => C3,
+    4: R4 => C4, 5: R5 => C5, 6: R6 => C6, 7: R7 => C7,
+    8: R8 => C8, 9: R9 => C9);
+gen_tuple_conversion!(
+    0: R0 => C0, 1: R1 => C1, 2: R2 => C2, 3: R3 => C3,
+    4: R4 => C4, 5: R5 => C5, 6: R6 => C6, 7: R7 => C7,
+    8: R8 => C8, 9: R9 => C9, 10: R10 => C10);
+gen_tuple_conversion!(
+    0: R0 => C0, 1: R1 => C1, 2: R2 => C2, 3: R3 => C3,
+    4: R4 => C4, 5: R5 => C5, 6: R6 => C6, 7: R7 => C7,
+    8: R8 => C8, 9: R9 => C9, 10: R10 => C10, 11: R11 => C11);
+gen_tuple_conversion!(
+    0: R0 => C0, 1: R1 => C1, 2: R2 => C2, 3: R3 => C3,
+    4: R4 => C4, 5: R5 => C5, 6: R6 => C6, 7: R7 => C7,
+    8: R8 => C8, 9: R9 => C9, 10: R10 => C10, 11: R11 => C11,
+    12: R12 => C12);
+gen_tuple_conversion!(
+    0: R0 => C0, 1: R1 => C1, 2: R2 => C2, 3: R3 => C3,
+    4: R4 => C4, 5: R5 => C5, 6: R6 => C6, 7: R7 => C7,
+    8: R8 => C8, 9: R9 => C9, 10: R10 => C10, 11: R11 => C11,
+    12: R12 => C12, 13: R13 => C13);
+gen_tuple_conversion!(
+    0: R0 => C0, 1: R1 => C1, 2: R2 => C2, 3: R3 => C3,
+    4: R4 => C4, 5: R5 => C5, 6: R6 => C6, 7: R7 => C7,
+    8: R8 => C8, 9: R9 => C9, 10: R10 => C10, 11: R11 => C11,
+    12: R12 => C12, 13: R13 => C13, 14: R14 => C14);
+gen_tuple_conversion!(
+    0: R0 => C0, 1: R1 => C1, 2: R2 => C2, 3: R3 => C3,
+    4: R4 => C4, 5: R5 => C5, 6: R6 => C6, 7: R7 => C7,
+    8: R8 => C8, 9: R9 => C9, 10: R10 => C10, 11: R11 => C11,
+    12: R12 => C12, 13: R13 => C13, 14: R14 => C14, 15: R15 => C15);
 
 impl<R, C> IntoValue<C> for Option<R>
 where
@@ -422,8 +548,8 @@ where
 mod test {
     use std::collections::{BTreeMap, HashMap};
 
+    use crate::types::{Date, Int, List, Map, Time};
     use crate::*;
-    use crate::types::{Date, Int, List, Map};
 
     #[test]
     fn convert_i64_into_value() {
@@ -445,6 +571,30 @@ mod test {
         let buf: Vec<u8> = vec![1, 2];
         let v = Value::from(buf);
         assert_eq!(v, Value::bytes(vec![1, 2]))
+    }
+
+    #[test]
+    fn convert_tuple_to_default_value() {
+        let tuple = (1, "foo");
+        let v = Value::from(tuple);
+        assert_eq!(v, Value::list(vec![Value::int(1), Value::string("foo")]))
+    }
+
+    #[test]
+    fn convert_tuple_to_typed_value() {
+        let tuple = (1, 100);
+        let v = Value::of_type((Int, Time), tuple);
+        assert_eq!(v, Value::list(vec![Value::int(1), Value::time(100)]))
+    }
+
+    #[test]
+    fn convert_large_tuple_to_value() {
+        let tuple = (1, 2, 3, 4, 5, "foo");
+        let v = Value::from(tuple);
+        match v.inner {
+            Some(value::Inner::Collection(value)) if value.elements.len() == 6 => {}
+            inner => assert!(false, "Unexpected inner value {:?}", inner),
+        }
     }
 
     #[test]

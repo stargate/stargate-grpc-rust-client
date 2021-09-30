@@ -134,7 +134,7 @@ macro_rules! count {
 
 /// Generates `TryFromValue` and `TryFrom<Value>` implementations for tuples of fixed size,
 /// denoted by the number of arguments.
-macro_rules! gen_convert_value_tuple {
+macro_rules! gen_tuple_conversion {
     ($($T:ident),+) => {
 
         // for 2-ary tuples expands to: `impl <A2, A1> TryFromValue for (A2, A1)`
@@ -162,18 +162,16 @@ macro_rules! gen_convert_value_tuple {
 
 /// Calls `gen_convert_value_tuple!` recursively to generate conversions for all tuples
 /// starting at size 2 and ending at the size specified by the number of arguments.
-macro_rules! gen_convert_value_all_tuples {
+macro_rules! gen_all_tuple_conversions {
     ($first:ident) => {};
     ($first:ident, $($tail:ident),*) => {
-        gen_convert_value_tuple!($first, $($tail),*);
-        gen_convert_value_all_tuples!($($tail),*);
+        gen_tuple_conversion!($first, $($tail),*);
+        gen_all_tuple_conversions!($($tail),*);
     }
 }
 
 // Generate conversions for all tuples up to size 16
-gen_convert_value_all_tuples!(
-    A16, A15, A14, A13, A12, A11, A10, A9, A8, A7, A6, A5, A4, A3, A2, A1
-);
+gen_all_tuple_conversions!(A16, A15, A14, A13, A12, A11, A10, A9, A8, A7, A6, A5, A4, A3, A2, A1);
 
 /// Converts the Value into itself.
 /// Actually the compiler will translate it to a no-op, as no copies are made.
