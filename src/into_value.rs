@@ -12,27 +12,33 @@ use crate::*;
 /// The default type is used when a Rust value `x` is converted to `Value` by calling
 /// `x.into()` or `Value::from(x)`.
 ///
-/// In order to convert a Rust value to a non-default Cassandra type,
-/// use [`Value::of_type()`].
+/// In order to convert a Rust value to a non-default Cassandra type, or to convert
+/// a Rust type that doesn't have a default conversion defined, use [`Value::of_type()`].
 ///
 /// # Default type mapping
 ///
-/// | Rust type        | gRPC type       |
-/// |------------------|-----------------|
-/// | `i8`             | `Int`           |
-/// | `i16`            | `Int`           |
-/// | `i32`            | `Int`           |
-/// | `i64`            | `Int`           |
-/// | `f32`            | `Float`         |
-/// | `f64`            | `Double`        |
-/// | `bool`           | `Boolean`       |
-/// | `String`         | `String`        |
-/// | `Vec<u8>`        | `Bytes`         |
-/// | `Vec<T>`         | `List`          |
-/// | `Vec<KeyValue>`  | `Map`           |
-/// | `HashMap<K, V>`  | `Map`           |
-/// | `BTreeMap<K, V>` | `Map            |
-/// | `(T1, T2, ...)`  | `List`          |
+/// | Rust type                     | gRPC type (types::*)  |
+/// |-------------------------------|-----------------------|
+/// | `i8`                          | `Int`                 |
+/// | `i16`                         | `Int`                 |
+/// | `i32`                         | `Int`                 |
+/// | `i64`                         | `Int`                 |
+/// | `f32`                         | `Float`               |
+/// | `f64`                         | `Double`              |
+/// | `bool`                        | `Boolean`             |
+/// | `String`                      | `String`              |
+/// | `&str`                        | `String`              |
+/// | `Vec<u8>`                     | `Bytes`               |
+/// | `Vec<T>`                      | `List`                |
+/// | `Vec<KeyValue>`               | `Map`                 |
+/// | `HashMap<K, V>`               | `Map`                 |
+/// | `BTreeMap<K, V>`              | `Map                  |
+/// | `(T1, T2, ...)`               | `List`                |
+/// | `stargate_grpc::Decimal`      | `Decimal`             |
+/// | `stargate_grpc::Inet`         | `Inet`                |
+/// | `stargate_grpc::UdtValue`     | `Udt`                 |
+/// | `stargate_grpc::Uuid`         | `Uuid`                |
+/// | `stargate_grpc::Varint`       | `Varint`              |
 ///
 /// # Example
 /// ```
@@ -52,7 +58,7 @@ use crate::*;
 ///
 /// ```
 pub trait DefaultCassandraType {
-    /// gRPC type, must be set to one of the types defined in the `types` module.
+    /// gRPC type, must be set to one of the types defined in the [`types`](crate::types) module.
     type C;
 }
 
@@ -71,6 +77,12 @@ impl DefaultCassandraType for i32 {
 impl DefaultCassandraType for i64 {
     type C = types::Int;
 }
+impl DefaultCassandraType for u16 {
+    type C = types::Int;
+}
+impl DefaultCassandraType for u32 {
+    type C = types::Int;
+}
 impl DefaultCassandraType for f32 {
     type C = types::Float;
 }
@@ -85,6 +97,21 @@ impl DefaultCassandraType for &str {
 }
 impl DefaultCassandraType for Vec<u8> {
     type C = types::Bytes;
+}
+impl DefaultCassandraType for Decimal {
+    type C = types::Decimal;
+}
+impl DefaultCassandraType for Inet {
+    type C = types::Inet;
+}
+impl DefaultCassandraType for UdtValue {
+    type C = types::Udt;
+}
+impl DefaultCassandraType for Uuid {
+    type C = types::Uuid;
+}
+impl DefaultCassandraType for Varint {
+    type C = types::Varint;
 }
 
 impl<T> DefaultCassandraType for Option<T>
@@ -143,21 +170,65 @@ impl Value {
     }
 
     /// Converts a Rust value to a `Value` of gRPC type specified by one of the types from
-    /// the [`types`] module. This is useful when a non-default conversion is needed.
+    /// the [`types`] module.
+    ///
+    /// Provides additional compile-time type safety by letting the compiler
+    /// know the exact type of data that needs to be generated.
+    /// If the desired type cannot be converted to, the code wouldn't compile,
+    /// and you wouldn't waste time trying to run your queries with invalid data.
+    ///
+    /// Additionally, some Rust types allow more than one target gRPC type, e.g.
+    /// `u32` can be converted to either an `Int` or a `Date`. This method allows to select
+    /// a non-default target type in such case.
+    /// Additionally, `u64` doesn't have the default conversion to `Time` defined in order
+    /// to avoid accidental confusion with integers, so it also must be converted explicitly.
     ///
     /// # Example
     /// ```
     /// use stargate_grpc::Value;
     /// use stargate_grpc::types::*;
     ///
-    /// // by default Vec<u8> get converted to Bytes, but here we want to convert them to Inet
-    /// let addr1 = vec![127, 0, 0, 1];
-    /// let addr2 = vec![127, 0, 0, 2];
-    /// let expected = Value::list(vec![Value::inet(addr1.clone()), Value::inet(addr2.clone())]);
-    /// let addresses = Value::of_type(List(Inet), vec![addr1, addr2]);
-    /// assert_eq!(addresses, expected);
+    /// let integers = Value::of_type(List(Int), vec![1, 2]);
+    /// assert_eq!(integers, Value::list(vec![
+    ///     Value::int(1),
+    ///     Value::int(2)
+    /// ]));
+    ///
+    /// let timestamps = Value::of_type(List(Time), vec![1633005636085, 1633005636090]);
+    /// assert_eq!(timestamps, Value::list(vec![
+    ///     Value::time(1633005636085),
+    ///     Value::time(1633005636090)
+    /// ]));
+    ///
+    /// // This wouldn't compile:
+    /// // let strings = Value::of_type(List(String), vec![1, 2]);
     /// ```
-    pub fn of_type<R: IntoValue<C>, C>(_cassandra_type: C, value: R) -> Value {
+    ///
+    /// In cases where you don't want to describe the result type fully, or where you need
+    /// to specify a heterogeneous collection of items of different types, you can use
+    /// [`types::Any`](crate::types::Any) to let the compiler figure out the target type
+    /// automatically based on the source type.
+    ///
+    /// # Example
+    /// ```
+    /// use std::collections::{BTreeMap};
+    /// use stargate_grpc::Value;
+    /// use stargate_grpc::types::{Map, Time, Any};
+    ///
+    /// // Create a map that holds values of different types
+    /// let mut map = BTreeMap::new();
+    /// map.insert(1, Value::int(1));
+    /// map.insert(2, Value::string("foo"));
+    ///
+    /// // Specify the keys should be converted to time:
+    /// let value = Value::of_type(Map(Time, Any), map);
+    ///
+    /// assert_eq!(value, Value::map(vec![
+    ///     (Value::time(1), Value::int(1)),
+    ///     (Value::time(2), Value::string("foo")),
+    /// ]));
+    /// ```
+    pub fn of_type<R: IntoValue<C>, C>(_type_spec: C, value: R) -> Value {
         value.into_value()
     }
 
@@ -252,7 +323,7 @@ impl Value {
     }
 
     /// Converts an iterable collection to a `Value` representing a list.
-    /// Items are converted to `Value` if needed.
+    /// Items are converted to `Value` using the default conversion.
     ///
     /// # Example
     /// ```
@@ -263,23 +334,44 @@ impl Value {
     ///     Value::list(vec![Value::int(1), Value::int(2)])
     /// );
     /// ```
+    /// See also [`Value::list_of_type()`].
     pub fn list<I, T>(elements: I) -> Value
     where
         I: IntoIterator<Item = T>,
         T: Into<Value>,
     {
-        let elements = elements.into_iter().map(|e| e.into()).collect_vec();
+        Value::list_of(types::Any, elements)
+    }
+
+    /// Converts an iterable collection to a `Value` representing a list of elements of given type.
+    /// Each element of the iterable is converted to a type denoted by type `E`.
+    ///
+    /// # Example
+    /// ```
+    /// use stargate_grpc::{types, Value};
+    ///
+    /// assert_eq!(
+    ///     Value::list_of(types::Time, vec![1, 2]),
+    ///     Value::list(vec![Value::time(1), Value::time(2)])
+    /// );
+    pub fn list_of<E, I, T>(_element_type: E, elements: I) -> Value
+    where
+        I: IntoIterator<Item = T>,
+        T: IntoValue<E>,
+    {
+        let elements = elements.into_iter().map(|e| e.into_value()).collect_vec();
         Value {
             inner: Some(value::Inner::Collection(Collection { elements })),
         }
     }
 
     /// Converts a collection of key-value pairs to a `Value` representing a map.
-    /// Keys and values are converted to `Value` as needed.
+    /// Keys and values of the map are converted to a `Value` of the default type.
     ///
     /// # Type Parameters
-    /// - `K`: type of the keys
-    /// - `V`: type of the values
+    /// - `I`: type of the collection
+    /// - `K`: type of the keys in the input collection
+    /// - `V`: type of the values in the input collection
     ///
     /// # Example
     /// ```
@@ -298,18 +390,57 @@ impl Value {
     ///     ])
     /// );
     /// ```
-    pub fn map<I, K, V>(elements: I) -> Value
+    pub fn map<I, K, V>(key_value_pairs: I) -> Value
     where
         I: IntoIterator<Item = (K, V)>,
         K: Into<Value>,
         V: Into<Value>,
     {
+        Value::map_of(types::Any, types::Any, key_value_pairs)
+    }
+
+    /// Converts a collection of key-value pairs to a `Value` representing a Cassandra map.
+    /// Keys and values of the map are converted to gRPC types specified by `CK` and `CV` types.
+    ///
+    /// The calling code will not compile if the elements of the map cannot be converted
+    /// to given gRPC types.
+    ///
+    /// # Type Parameters
+    /// - `I`: type of the collection
+    /// - `RK`: type of the keys in the input collection
+    /// - `RV`: type of the values in the input collection
+    /// - `CK`: desired gRPC type of the keys of the result map
+    /// - `CV`: desired gRPC type of the values of the result map
+    ///
+    /// # Example
+    /// ```
+    /// use stargate_grpc::{types, Value, Inet};
+    /// use std::collections::{BTreeMap};
+    ///
+    /// let mut map = BTreeMap::new();
+    /// map.insert(1, Inet { value: vec![127, 0, 0, 1] });
+    /// map.insert(2, Inet { value: vec![127, 0, 0, 2] });
+    ///
+    /// assert_eq!(
+    ///     Value::map_of(types::Int, types::Inet, map),
+    ///     Value::map(vec![
+    ///         (Value::int(1), Value::inet(vec![127, 0, 0, 1])),
+    ///         (Value::int(2), Value::inet(vec![127, 0, 0, 2]))
+    ///     ])
+    /// );
+    /// ```
+    pub fn map_of<CK, CV, I, RK, RV>(_key_type: CK, _value_type: CV, elements: I) -> Value
+    where
+        I: IntoIterator<Item = (RK, RV)>,
+        RK: IntoValue<CK>,
+        RV: IntoValue<CV>,
+    {
         let iter = elements.into_iter();
         let (size_hint_lower, size_hint_upper) = iter.size_hint();
         let mut collection = Vec::with_capacity(size_hint_upper.unwrap_or(size_hint_lower) * 2);
         for (k, v) in iter {
-            collection.push(k.into());
-            collection.push(v.into());
+            collection.push(k.into_value());
+            collection.push(v.into_value());
         }
         Value {
             inner: Some(value::Inner::Collection(Collection {
@@ -318,8 +449,24 @@ impl Value {
         }
     }
 
-    pub fn udt<K, V>(fields: HashMap<K, V>) -> Value
+    /// Converts a collection of key-value pairs into a `Value` representing a Cassandra UDT.
+    ///
+    /// Keys must be convertible to strings anv values must be convertible to `Value`.
+    ///
+    /// # Example
+    /// ```
+    /// use stargate_grpc::Value;
+    /// use std::collections::HashMap;
+    ///
+    /// let mut obj = HashMap::new();
+    /// obj.insert("field1", 1);
+    /// obj.insert("field2", 2);
+    ///
+    /// let udt_value = Value::udt(obj);
+    /// ```
+    pub fn udt<I, K, V>(fields: I) -> Value
     where
+        I: IntoIterator<Item = (K, V)>,
         K: ToString,
         V: Into<Value>,
     {
@@ -327,9 +474,11 @@ impl Value {
             .into_iter()
             .map(|(k, v)| (k.to_string(), v.into()))
             .collect();
-        Value {
-            inner: Some(value::Inner::Udt(UdtValue { fields })),
-        }
+        Value::raw_udt(UdtValue { fields })
+    }
+
+    fn raw_udt(value: UdtValue) -> Value {
+        Value { inner: Some(value::Inner::Udt(value))}
     }
 }
 
@@ -392,8 +541,12 @@ gen_conversion!(String => types::String; x => Value::string(x));
 gen_conversion!(&str => types::String; x => Value::string(x.to_string()));
 
 gen_conversion!(Vec<u8> => types::Bytes; x => Value::bytes(x));
-gen_conversion!(Vec<u8> => types::Inet; x => Value::inet(x));
-gen_conversion!(Vec<u8> => types::Varint; x => Value::varint(x));
+
+gen_conversion!(Decimal => types::Decimal; x => Value::decimal(x.scale, x.value));
+gen_conversion!(Inet => types::Inet; x => Value::inet(x.value));
+gen_conversion!(UdtValue => types::Udt; x => Value::raw_udt(x));
+gen_conversion!(Uuid => types::Uuid; x => Value::uuid(x.value));
+gen_conversion!(Varint => types::Varint; x => Value::varint(x.value));
 
 /// Generates generic conversion from a Rust tuple to `Value`.
 ///
@@ -597,6 +750,18 @@ mod test {
     }
 
     #[test]
+    fn convert_float_into_value() {
+        let v: Value = 100.0f32.into();
+        assert_eq!(v, Value::float(100.0));
+    }
+
+    #[test]
+    fn convert_double_into_value() {
+        let v: Value = 100.0.into();
+        assert_eq!(v, Value::double(100.0));
+    }
+
+    #[test]
     fn convert_string_into_value() {
         let v: Value = "foo".into();
         assert_eq!(v, Value::string("foo"));
@@ -610,6 +775,34 @@ mod test {
         let buf: Vec<u8> = vec![1, 2];
         let v = Value::from(buf);
         assert_eq!(v, Value::bytes(vec![1, 2]))
+    }
+
+    #[test]
+    fn convert_uuid_into_value() {
+        let uuid = Uuid { value: vec![1, 2] }; // not really valid UUID, but the type is ok
+        let v = Value::from(uuid);
+        assert_eq!(v, Value::uuid(vec![1, 2]))
+    }
+
+    #[test]
+    fn convert_inet_into_value() {
+        let inet = Inet { value: vec![127, 0, 0, 1] };
+        let v = Value::from(inet);
+        assert_eq!(v, Value::inet(vec![127, 0, 0, 1]))
+    }
+
+    #[test]
+    fn convert_decimal_into_value() {
+        let decimal = Decimal { scale: 2, value: vec![10, 0] };
+        let v = Value::from(decimal);
+        assert_eq!(v, Value::decimal(2, vec![10, 0]))
+    }
+
+    #[test]
+    fn convert_varint_into_value() {
+        let varint = Varint { value: vec![10, 0] };
+        let v = Value::from(varint);
+        assert_eq!(v, Value::varint(vec![10, 0]))
     }
 
     #[test]
@@ -736,6 +929,19 @@ mod test {
         map.insert("field1", Value::int(1));
         map.insert("field2", Value::string("bar"));
         let v = Value::udt(map);
+        match v.inner {
+            Some(value::Inner::Udt(value)) if value.fields.len() == 2 => {}
+            inner => assert!(false, "Unexpected udt inner value {:?}", inner),
+        }
+    }
+
+    #[test]
+    fn convert_raw_udt_value_to_value() {
+        let mut map = HashMap::new();
+        map.insert("field1".to_string(), Value::int(1));
+        map.insert("field2".to_string(), Value::string("bar"));
+        let udt_value = UdtValue { fields: map };
+        let v = Value::from(udt_value);
         match v.inner {
             Some(value::Inner::Udt(value)) if value.fields.len() == 2 => {}
             inner => assert!(false, "Unexpected udt inner value {:?}", inner),

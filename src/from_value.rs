@@ -41,14 +41,14 @@ impl Display for ConversionError {
 /// Implementations must not cause silent precision loss -
 /// e.g. converting from a `Double` to `f32` is not allowed.
 /// Returns `ConversionError` if the `Value` variant is incompatible with the target Rust type.
-/// A `ConverrsionError` is also returned if the underlying value is `Null` or `Unset`, but
+/// A `ConversionError` is also returned if the underlying value is `Null` or `Unset`, but
 /// the receiving type can't handle nulls, i.e. it is not a `Value` nor `Option`.
 ///
 /// We are not using the `TryFrom` trait from Rust core directly, because Rust stdlib defines
 /// blanket implementations of `TryFrom` and `TryInto` which would conflict with
 /// the implementations of this trait for converting e.g. `Value` into an `Option<T>`.
 /// Instead we selectively generate `TryFrom` implementations from `TryFromValue`
-/// using dedicated `gen_try_from` macros.
+/// using dedicated macros.
 pub trait TryFromValue: Sized {
     fn try_from(value: Value) -> Result<Self, ConversionError>;
 }
@@ -122,9 +122,7 @@ gen_conversion!(String; value::Inner::String(x) => x);
 gen_conversion!(UdtValue; value::Inner::Udt(x) => x);
 gen_conversion!(Uuid; value::Inner::Uuid(x) => x);
 gen_conversion!(Varint; value::Inner::Varint(x) => x);
-gen_conversion!(Vec<u8>;
-    value::Inner::Bytes(x) => x,
-    value::Inner::Uuid(x) => x.value);
+gen_conversion!(Vec<u8>; value::Inner::Bytes(x) => x);
 
 /// Counts the number of arguments
 macro_rules! count {
@@ -305,10 +303,59 @@ mod test {
     }
 
     #[test]
+    fn convert_value_to_f32() {
+        let v = Value::float(3.5);
+        let float: f32 = v.try_into().unwrap();
+        assert_eq!(float, 3.5)
+    }
+
+    #[test]
+    fn convert_value_to_f64() {
+        let v = Value::double(3.5);
+        let double: f64 = v.try_into().unwrap();
+        assert_eq!(double, 3.5)
+    }
+
+    #[test]
     fn convert_value_to_string() {
-        let v = Value::string("foo".to_string());
+        let v = Value::string("foo");
         let s: String = v.try_into().unwrap();
         assert_eq!(s, "foo".to_string())
+    }
+
+    #[test]
+    fn convert_bytes_value_to_vec() {
+        let v = Value::bytes(vec![1, 2]);
+        let buf: Vec<u8> = v.try_into().unwrap();
+        assert_eq!(buf, vec![1, 2])
+    }
+
+    #[test]
+    fn convert_value_to_inet() {
+        let v = Value::inet(vec![1, 2]);
+        let inet: Inet = v.try_into().unwrap();
+        assert_eq!(inet, Inet { value: vec![1, 2] })
+    }
+
+    #[test]
+    fn convert_value_to_decimal() {
+        let v = Value::decimal(2, vec![1, 2]);
+        let decimal: Decimal = v.try_into().unwrap();
+        assert_eq!(decimal, Decimal { scale: 2, value: vec![1, 2] })
+    }
+
+    #[test]
+    fn convert_value_to_varint() {
+        let v = Value::varint(vec![1, 2]);
+        let varint: Varint = v.try_into().unwrap();
+        assert_eq!(varint, Varint { value: vec![1, 2] })
+    }
+
+    #[test]
+    fn convert_value_to_uuid() {
+        let v = Value::uuid(vec![1, 2]);
+        let varint: Uuid = v.try_into().unwrap();
+        assert_eq!(varint, Uuid { value: vec![1, 2] })
     }
 
     #[test]
