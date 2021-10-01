@@ -1,19 +1,17 @@
 use std::convert::TryFrom;
-
-use crate::stargate_client::StargateClient;
-pub use from_value::*;
-pub use into_value::*;
-use prost::DecodeError;
-use regex::Regex;
-use std::borrow::Borrow;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
-use std::marker::PhantomData;
+
+use prost::DecodeError;
+use regex::Regex;
 use tonic::codegen::{InterceptedService, StdError};
-use tonic::metadata::errors::InvalidMetadataValue;
 use tonic::metadata::AsciiMetadataValue;
 use tonic::service::Interceptor;
 use tonic::{Request, Status};
+
+pub use from_value::*;
+pub use into_value::*;
+use std::str::FromStr;
 
 mod from_value;
 mod into_value;
@@ -51,24 +49,20 @@ impl Error for InvalidAuthToken {}
 ///
 /// {"authToken":"25b538f6-3092-4fd1-8dd4-e73408f2bd60"}
 /// </pre>
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct AuthToken(AsciiMetadataValue);
 
-impl AuthToken {
-    pub fn new(v: AsciiMetadataValue) -> AuthToken {
-        AuthToken(v)
-    }
+impl FromStr for AuthToken {
+    type Err = InvalidAuthToken;
 
     /// Creates a new authentication token from a String.
     /// This will fail if the string is not a valid UUID.
-    pub fn from_str(s: &str) -> Result<AuthToken, InvalidAuthToken> {
+    fn from_str(s: &str) -> Result<AuthToken, InvalidAuthToken> {
         let pattern =
             r"^[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}$";
         let pattern = Regex::new(pattern).unwrap();
         if pattern.is_match(s) {
-            match AsciiMetadataValue::from_str(s) {
-                Ok(value) => Ok(AuthToken(value)),
-                Err(e) => Err(InvalidAuthToken(s.to_string())),
-            }
+            Ok(AuthToken(AsciiMetadataValue::from_str(s).unwrap()))
         } else {
             Err(InvalidAuthToken(s.to_string()))
         }
@@ -87,7 +81,12 @@ impl Interceptor for AuthToken {
     }
 }
 
-impl StargateClient<InterceptedService<tonic::transport::Channel, AuthToken>> {
+/// Type alias for the most commonly used `StargateClient` type
+/// with support for authentication.
+pub type StargateClient =
+    stargate_client::StargateClient<InterceptedService<tonic::transport::Channel, AuthToken>>;
+
+impl StargateClient {
     /// Obtains a new `StargateClient` that attaches the authentication `token` to each request.
     pub async fn connect_with_auth<D>(
         dst: D,
@@ -98,7 +97,7 @@ impl StargateClient<InterceptedService<tonic::transport::Channel, AuthToken>> {
         D::Error: Into<StdError>,
     {
         let conn = tonic::transport::Endpoint::new(dst)?.connect().await?;
-        Ok(StargateClient::with_interceptor(conn, token))
+        Ok(stargate_client::StargateClient::with_interceptor(conn, token))
     }
 }
 
