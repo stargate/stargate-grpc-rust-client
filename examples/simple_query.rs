@@ -3,8 +3,8 @@ use std::convert::TryInto;
 use anyhow::anyhow;
 use tonic::metadata::AsciiMetadataValue;
 
-use stargate_grpc::*;
 use stargate_grpc::stargate_client::*;
+use stargate_grpc::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -14,8 +14,9 @@ async fn main() -> anyhow::Result<()> {
 
     let token =
         std::env::var("SG_TOKEN").map_err(|_| anyhow!("Missing SG_TOKEN environment variable"))?;
+    let token = AuthToken::from_str(token.as_str())?;
 
-    let mut client = StargateClient::connect(url.to_owned()).await?;
+    let mut client = StargateClient::connect_with_auth(url.to_owned(), token).await?;
 
     let query = Query {
         cql: "SELECT id, login, emails FROM test.users".into(),
@@ -23,13 +24,7 @@ async fn main() -> anyhow::Result<()> {
         parameters: None,
     };
 
-    let mut request = tonic::Request::new(query);
-    request.metadata_mut().insert(
-        "x-cassandra-token",
-        AsciiMetadataValue::from_str(token.as_str())?,
-    );
-
-    let response = client.execute_query(request).await?;
+    let response = client.execute_query(query).await?;
     let result_set: ResultSet = response.try_into()?;
 
     for row in result_set.rows {
