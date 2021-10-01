@@ -26,19 +26,7 @@ async fn print_table_contents(client: &mut StargateClient) -> anyhow::Result<()>
     let result_set: ResultSet = response.try_into()?;
 
     for row in result_set.rows {
-        let mut values = row.values.into_iter();
-        let id: i64 = values
-            .next()
-            .ok_or(anyhow!("Missing column: id"))?
-            .try_into()?;
-        let login: String = values
-            .next()
-            .ok_or(anyhow!("Missing column: login"))?
-            .try_into()?;
-        let emails: Vec<String> = values
-            .next()
-            .ok_or(anyhow!("Missing column: emails"))?
-            .try_into()?;
+        let (id, login, emails): (i64, String, Vec<String>) = row.try_into()?;
         println!("{} {} {:?}", id, login, emails);
     }
 

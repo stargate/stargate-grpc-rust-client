@@ -49,7 +49,7 @@ macro_rules! gen_std_conversion {
     };
 }
 
-/// Same as `gen_try_from_for` but accepts generic types.
+/// Same as `gen_std_conversion` but accepts generic types.
 ///
 /// The macro syntax is: `gen_try_from_generic!(<Arg1, Arg2, ..., ArgN> GenericType)`.
 /// All type arguments must have implementations of `TryFromValue`.
@@ -75,7 +75,7 @@ macro_rules! gen_conversion {
             fn try_from(value: Value) -> Result<Self, ConversionError> {
                 match value.inner {
                     $(Some($from) => Ok($to)),+,
-                    other => Err(ConversionError::no_recipe::<Self, _>(other)),
+                    other => Err(ConversionError::incompatible::<_, Self>(other)),
                 }
             }
         }
@@ -117,14 +117,37 @@ macro_rules! gen_tuple_conversion {
             fn try_from(value: Value) -> Result<Self, ConversionError> {
                 match value.inner {
                     // if the size doesn't match, we just bail out in the `other` case
-                    Some(value::Inner::Collection(c)) if c.elements.len() == count!($($T)+) => {
+                    Some(value::Inner::Collection(c)) => {
+                        let len = c.elements.len();
+                        let expected_len = count!($($T)+);
+                        if len != expected_len {
+                            return Err(ConversionError::wrong_number_of_items::<_, Self>(c, len, expected_len));
+                        }
                         let mut i = c.elements.into_iter();
                         Ok((
                             $({ let x: $T = i.next().unwrap().try_into()?; x }),+
                         ))
                     }
-                    other => Err(ConversionError::no_recipe::<Self, _>(other)),
+                    other => Err(ConversionError::incompatible::<_, Self>(other)),
                 }
+            }
+        }
+
+        impl<$($T),+> TryFrom<Row> for ($($T),+)
+        where $($T: TryFromValue),+
+        {
+            type Error = ConversionError;
+
+            fn try_from(row: Row) -> Result<Self, ConversionError> {
+                let len = row.values.len();
+                let expected_len = count!($($T)+);
+                if len != expected_len {
+                    return Err(ConversionError::wrong_number_of_items::<_, Self>(row, len, expected_len));
+                }
+                let mut i = row.values.into_iter();
+                Ok((
+                    $({ let x: $T = i.next().unwrap().try_into()?; x }),+
+                ))
             }
         }
 
@@ -186,7 +209,7 @@ where
             Some(value::Inner::Collection(c)) => {
                 Ok(c.elements.into_iter().map(|e| e.try_into()).try_collect()?)
             }
-            other => Err(ConversionError::no_recipe::<Self, _>(other)),
+            other => Err(ConversionError::incompatible::<_, Self>(other)),
         }
     }
 }
@@ -222,7 +245,7 @@ where
                 }
                 Ok(result)
             }
-            other => Err(ConversionError::no_recipe::<Self, _>(other)),
+            other => Err(ConversionError::incompatible::<_, Self>(other)),
         }
     }
 }
@@ -455,5 +478,43 @@ mod test {
 
         let v1 = Value::int(1);
         assert_eq!(1, into_i64(v1));
+    }
+
+    #[test]
+    fn convert_row_to_i64() {
+        let values = vec![Value::int(1)];
+        let row = Row { values };
+        let int: i64 = row.into_single().unwrap();
+        assert_eq!(int, 1);
+    }
+
+    #[test]
+    fn convert_row_to_list() {
+        let values = vec![Value::list(vec![1, 2, 3])];
+        let row = Row { values };
+        let int: Vec<i64> = row.into_single().unwrap();
+        assert_eq!(int, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn convert_row_to_tuple() {
+        let values = vec![Value::int(1), Value::double(2.0), Value::string("foo")];
+        let row = Row { values };
+        let (a, b, c): (i64, f64, String) = row.try_into().unwrap();
+        assert_eq!(a, 1);
+        assert_eq!(b, 2.0);
+        assert_eq!(c, "foo".to_string());
+    }
+
+    #[test]
+    fn convert_single_item_of_a_row() {
+        let values = vec![Value::int(1), Value::double(2.0), Value::string("foo")];
+        let row = Row { values };
+        let a: i64 = row.get(0).unwrap();
+        let b: f64 = row.get(1).unwrap();
+        let c: String = row.get(2).unwrap();
+        assert_eq!(a, 1);
+        assert_eq!(b, 2.0);
+        assert_eq!(c, "foo".to_string());
     }
 }

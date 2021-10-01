@@ -1,17 +1,17 @@
 use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
+use std::str::FromStr;
 
 use prost::DecodeError;
 use regex::Regex;
+use tonic::{Request, Status};
 use tonic::codegen::{InterceptedService, StdError};
 use tonic::metadata::AsciiMetadataValue;
 use tonic::service::Interceptor;
-use tonic::{Request, Status};
 
 pub use from_value::*;
 pub use into_value::*;
-use std::str::FromStr;
 
 mod from_value;
 mod into_value;
@@ -97,7 +97,9 @@ impl StargateClient {
         D::Error: Into<StdError>,
     {
         let conn = tonic::transport::Endpoint::new(dst)?.connect().await?;
-        Ok(stargate_client::StargateClient::with_interceptor(conn, token))
+        Ok(stargate_client::StargateClient::with_interceptor(
+            conn, token,
+        ))
     }
 }
 
@@ -105,36 +107,48 @@ impl StargateClient {
 /// converted to a desired Rust type.
 #[derive(Clone, Debug)]
 pub struct ConversionError {
-    kind: ConversionErrorKind,
-    value: String,
-    rust_type_name: &'static str,
+    /// Describes the reason why the conversion failed
+    pub kind: ConversionErrorKind,
+    /// Debug string of the source value that failed to be converted
+    pub source: String,
+    /// Name of the target Rust type that the value failed to convert to
+    pub target_type_name: String,
 }
 
 #[derive(Clone, Debug)]
 pub enum ConversionErrorKind {
-    /// When the converter didn't know how to convert one type to another because the conversion
-    /// hasn't been defined
-    NoRecipe,
-    /// When the converter attempted to decode a binary blob, but conversion failed due to
-    /// invalid data
+    /// When the converter didn't know how to convert one type to another
+    /// because the conversion hasn't been defined
+    Incompatible,
+
+    /// When the number of elements in a vector or a tuple
+    /// does not match the expected number of elements.
+    WrongNumberOfItems { actual: usize, expected: usize },
+
+    /// When the converter attempted to decode a binary blob,
+    /// but the conversion failed due to invalid data
     GrpcDecodeError(DecodeError),
 }
 
 impl ConversionError {
-    fn no_recipe<T, V: Debug>(cql_value: V) -> ConversionError {
+    fn new<S: Debug, T>(kind: ConversionErrorKind, source: S) -> ConversionError {
         ConversionError {
-            kind: ConversionErrorKind::NoRecipe,
-            value: format!("{:?}", cql_value),
-            rust_type_name: std::any::type_name::<T>(),
+            kind,
+            source: format!("{:?}", source),
+            target_type_name: std::any::type_name::<T>().to_string(),
         }
     }
 
-    fn decode_error<T, V: Debug>(cql_value: V, cause: DecodeError) -> ConversionError {
-        ConversionError {
-            kind: ConversionErrorKind::GrpcDecodeError(cause),
-            value: format!("{:?}", cql_value),
-            rust_type_name: std::any::type_name::<T>(),
-        }
+    fn incompatible<S: Debug, T>(source: S) -> ConversionError {
+        Self::new::<S, T>(ConversionErrorKind::Incompatible, source)
+    }
+
+    fn wrong_number_of_items<S: Debug, T>(source: S, actual: usize, expected: usize) -> ConversionError {
+        Self::new::<S, T>(ConversionErrorKind::WrongNumberOfItems { actual, expected }, source)
+    }
+
+    fn decode_error<S: Debug, T>(source: S, error: DecodeError) -> ConversionError {
+        Self::new::<S, T>(ConversionErrorKind::GrpcDecodeError(error), source)
     }
 }
 
@@ -143,7 +157,8 @@ impl Display for ConversionError {
         write!(
             f,
             "Cannot convert value {} to {}",
-            self.value, self.rust_type_name
+            self.source,
+            self.target_type_name
         )
     }
 }
@@ -217,10 +232,39 @@ impl TryFrom<tonic::Response<crate::Response>> for ResultSet {
             Some(response::Result::ResultSet(payload)) => {
                 use prost::Message;
                 let data: &prost_types::Any = payload.data.as_ref().unwrap();
-                ResultSet::decode(data.value.as_slice())
-                    .map_err(|e| ConversionError::decode_error::<ResultSet, _>(response, e))
+                ResultSet::decode(data.value.as_slice()).map_err(|e| {
+                    ConversionError::decode_error::<_, Self>( response, e)
+                })
             }
-            other => Err(ConversionError::no_recipe::<ResultSet, _>(other)),
+            other => Err(ConversionError::incompatible::<_, Self>(other))
+        }
+    }
+}
+
+impl Row {
+    /// Converts the row containing a single value into the desired type.
+    ///
+    /// Returns `ConversionError` if the row doesn't contain exactly one value or if a value
+    /// could not be converted to `T`.
+    pub fn into_single<T: TryFromValue>(self) -> Result<T, ConversionError> {
+        let len = self.values.len();
+        if len != 1 {
+            Err(ConversionError::wrong_number_of_items::<_, Self>(self, len, 1))
+        } else {
+            self.values.into_iter().next().unwrap().try_into()
+        }
+    }
+
+    /// Returns a value of a single column converted to a desired type.
+    ///
+    /// This function does not move the value out of the row. It makes a copy before
+    /// the conversion instead.
+    pub fn get<T: TryFromValue>(&self, index: usize) -> Result<T, ConversionError> {
+        let len = self.values.len();
+        if index >= len {
+            Err(ConversionError::wrong_number_of_items::<_, T>(self, len, index))
+        } else {
+            self.values[index].clone().try_into()
         }
     }
 }
