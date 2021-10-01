@@ -575,6 +575,14 @@ macro_rules! gen_tuple_conversion {
             }
         }
 
+        impl <$($R),+> From<($($R),+)> for QueryValues
+        where $($R: IntoValue<types::Any>),+
+        {
+            fn from(tuple: ($($R),+)) -> Self {
+                QueryValues(vec![$(tuple.$index.into_value()),+])
+            }
+        }
+
         impl<$($R),+> DefaultCassandraType for ($($R),+)
         where $($R: DefaultCassandraType),+
         {
