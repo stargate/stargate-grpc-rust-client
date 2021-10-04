@@ -4,6 +4,14 @@ This crate provides a high-level async Rust driver for querying [DataStax Starga
 It exposes the client stubs generated from gRPC proto files together with a set of 
 utilities that make them easier to work with.
 
+- [Features](#features)
+- [Quick start guide](#quick-start-guide)
+   - [Connecting](#establishing-the-connection)
+   - [Querying](#querying)
+   - [Processing the result set](#processing-the-result-set)
+- [Building](#building-from-source)
+- [Running the example](#running-the-example)
+
 ## Features
 - All of the Stargate gRPC protocol messages exposed as Rust structures and enums
 - Token-based authentication
@@ -29,7 +37,7 @@ Add the following line to the includes in the source code of your app:
 use stargate_grpc::*;
 ```
 
-### Establishing the connection
+### Connecting
 The main structure that provides the interface to Stargate is `StargateClient`. 
 Pass the Stargate endpoint URL and the authentication token to `connect_with_auth()` to obtain 
 an instance:
