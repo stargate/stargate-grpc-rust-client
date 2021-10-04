@@ -1,6 +1,6 @@
 [package]
 name = "stargate-grpc"
-description = "gRPC client for DataStax Stargate"
+description = "gRPC client for Stargate"
 version = "0.1.0"
 edition = "2018"
 

@@ -1,6 +1,6 @@
 # Rust gRPC Client Driver for Stargate  
 
-This crate provides a high-level async Rust driver for querying [DataStax Stargate](https://stargate.io/).
+This crate provides a high-level async Rust driver for querying [Stargate](https://stargate.io/).
 It exposes the client stubs generated from gRPC proto files together with a set of 
 utilities that make them easier to work with.
 
