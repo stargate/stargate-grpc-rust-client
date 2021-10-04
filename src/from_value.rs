@@ -105,12 +105,13 @@ macro_rules! count {
     ( $x:tt $($xs:tt)* ) => (1usize + count!($($xs)*));
 }
 
-/// Generates `TryFromValue` and `TryFrom<Value>` implementations for tuples of fixed size,
-/// denoted by the number of arguments.
+/// Generates `TryFromValue`, `TryFrom<Value>` and `TryFrom<Row>`
+/// implementations for tuples of fixed size, denoted by the number of arguments.
 macro_rules! gen_tuple_conversion {
     ($($T:ident),+) => {
 
-        // for 2-ary tuples expands to: `impl <A2, A1> TryFromValue for (A2, A1)`
+        // Converts values to tuples
+        // E.g. for 2-ary tuples expands to: `impl <A2, A1> TryFromValue for (A2, A1)`
         impl<$($T),+> TryFromValue for ($($T),+)
         where $($T: TryFromValue),+
         {
@@ -133,6 +134,11 @@ macro_rules! gen_tuple_conversion {
             }
         }
 
+        // Generates an analog `TryFrom<Value>` for tuples.
+        // for 2-ary tuples expands to: `gen_std_conversion_generic!(<A2, A1> (A2, A1))`
+        gen_std_conversion_generic!(<$($T),+> ($($T),+));
+
+        // Converts rows to tuples
         impl<$($T),+> TryFrom<Row> for ($($T),+)
         where $($T: TryFromValue),+
         {
@@ -150,9 +156,6 @@ macro_rules! gen_tuple_conversion {
                 ))
             }
         }
-
-        // for 2-ary tuples expands to: `gen_std_conversion_generic!(<A2, A1> (A2, A1))`
-        gen_std_conversion_generic!(<$($T),+> ($($T),+));
     }
 }
 
@@ -484,7 +487,7 @@ mod test {
     fn convert_row_to_i64() {
         let values = vec![Value::int(1)];
         let row = Row { values };
-        let int: i64 = row.into_single().unwrap();
+        let int: i64 = row.try_into_one().unwrap();
         assert_eq!(int, 1);
     }
 
@@ -492,7 +495,7 @@ mod test {
     fn convert_row_to_list() {
         let values = vec![Value::list(vec![1, 2, 3])];
         let row = Row { values };
-        let int: Vec<i64> = row.into_single().unwrap();
+        let int: Vec<i64> = row.try_into_one().unwrap();
         assert_eq!(int, vec![1, 2, 3]);
     }
 

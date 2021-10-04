@@ -1,7 +1,8 @@
 use crate::{ConversionError, Response, ResultSet, Row, TryFromValue};
 use std::convert::TryFrom;
 
-/// A handy conversion that let us get directly to the `ResultSet` returned by a query.
+/// A handy conversion that let us convert the gRPC response into the `ResultSet`
+/// returned by a query.
 impl TryFrom<tonic::Response<crate::Response>> for ResultSet {
     type Error = ConversionError;
 
@@ -19,11 +20,28 @@ impl TryFrom<tonic::Response<crate::Response>> for ResultSet {
 }
 
 impl Row {
+
     /// Converts the row containing a single value into the desired type.
     ///
     /// Returns `ConversionError` if the row doesn't contain exactly one value or if a value
     /// could not be converted to `T`.
-    pub fn into_single<T: TryFromValue>(self) -> Result<T, ConversionError> {
+    ///
+    /// # Example
+    /// ```
+    /// use stargate_grpc::{Row, Value};
+    ///
+    /// let row1 = Row {
+    ///     values: vec![Value::list(vec![1, 2, 3])]
+    /// };
+    /// let row2 = row1.clone();
+    ///
+    /// let vector: Vec<i64> = row1.try_into_one().unwrap();
+    /// assert_eq!(vector, vec![1, 2, 3]);
+    ///
+    /// let tuple: (i64, i64, i64) = row2.try_into_one().unwrap();
+    /// assert_eq!(tuple, (1, 2, 3));
+    /// ```
+    pub fn try_into_one<T: TryFromValue>(self) -> Result<T, ConversionError> {
         let len = self.values.len();
         if len != 1 {
             Err(ConversionError::wrong_number_of_items::<_, Self>(
@@ -38,6 +56,22 @@ impl Row {
     ///
     /// This function does not move the value out of the row. It makes a copy before
     /// the conversion instead.
+    ///
+    /// # Example
+    /// ```
+    /// use stargate_grpc::{Row, Value};
+    ///
+    /// let row = Row {
+    ///     values: vec![Value::int(1), Value::string("foo")]
+    /// };
+    ///
+    /// let id: i64 = row.get(0).unwrap();
+    /// let login: String = row.get(1).unwrap();
+    ///
+    /// assert_eq!(id, 1);
+    /// assert_eq!(login, "foo".to_string());
+    /// ```
+    ///
     pub fn get<T: TryFromValue>(&self, index: usize) -> Result<T, ConversionError> {
         let len = self.values.len();
         if index >= len {
