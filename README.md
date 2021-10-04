@@ -1,8 +1,18 @@
-# Rust Client Driver for Stargate Using gRPC 
+# Rust gRPC Client Driver for Stargate  
 
 This crate provides a high-level async Rust driver for querying [DataStax Stargate](https://stargate.io/).
 It exposes the client stubs generated from gRPC proto files together with a set of 
 utilities that make them easier to work with.
+
+## Features
+- All of the Stargate gRPC protocol messages exposed as Rust structures and enums
+- Token-based authentication
+- Asynchronous querying
+- Query builder with easy binding of variables by names or positions
+- Optional compile-time type-checking of query bind values
+- Easy conversions between gRPC value types and common Rust types; support for
+  primitive types, lists, maps, tuples and user-defined-types, with arbitrary nesting levels
+- Result set paging
 
 ## Quick start guide
 Add required dependencies. You'll need at least `stargate-grpc` and an async framework, 

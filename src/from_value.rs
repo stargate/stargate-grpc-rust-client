@@ -1,4 +1,4 @@
-//! Defines automatic conversions from `Value` to standard Rust types.
+//! Automatic conversions from `Value` to standard Rust types.
 
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;

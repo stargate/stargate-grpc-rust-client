@@ -1,4 +1,53 @@
 //! Automatic conversions from standard Rust types to `Value`
+//!
+//! Values can be obtained generically from commonly used Rust types using
+//! standard Rust [`Into`](std::convert::Into) or [`From`](std::convert::From) traits:
+//! ```rust
+//! # use stargate_grpc::Value;
+//!
+//! let int_value: Value = 5.into();             // == Value::int(5)
+//! let string_value: Value = "stargate".into(); // == Value::string("stargate")
+//! let list1: Value = vec![1, 2].into();        // == Value::list(vec![Value::int(1), Value::int(2)])
+//! let list2: Value = (1, 3.14).into();         // == Value::list(vec![Value::int(1), Value::double(3.14)])
+//! ```
+//!
+//! It is also possible to specify the desired target gRPC type to use [`Value::of_type()`]
+//! to disambiguate when more
+//! target types are possible or to make the conversion more type-safe:
+//! ```rust
+//! # use stargate_grpc::{types, Value};
+//!
+//! let int_value = Value::of_type(types::Int, 5);
+//! let timestamp_value = Value::of_type(types::Time, 1633005636085);
+//! // let string_value = Value::of_type(types::String, 10); // compile time error
+//! ```
+//! ## Available Conversions
+//! | Rust type                     | gRPC type (types::*)
+//! |-------------------------------|-----------------------
+//! | `i8`                          | `Int`                 |
+//! | `i16`                         | `Int`                 |
+//! | `i32`                         | `Int`                 |
+//! | `i64`                         | `Int`                 |
+//! | `u16`                         | `Int`                 |
+//! | `u32`                         | `Int`, `Date`         |
+//! | `u64`                         | `Time`                |
+//! | `f32`                         | `Float`               |
+//! | `f64`                         | `Double`              |
+//! | `bool`                        | `Boolean`             |
+//! | `String`                      | `String`              |
+//! | `&str`                        | `String`              |
+//! | `Vec<u8>`                     | `Bytes`               |
+//! | `Vec<T>`                      | `List`                |
+//! | `Vec<KeyValue>`               | `Map`                 |
+//! | `HashMap<K, V>`               | `Map`                 |
+//! | `BTreeMap<K, V>`              | `Map`                 |
+//! | `(T1, T2, ...)`               | `List`                |
+//! | [`Decimal`]                   | `Decimal`             |
+//! | [`Inet`]                      | `Inet`                |
+//! | [`UdtValue`]                  | `Udt`                 |
+//! | [`Uuid`]                      | `Uuid`                |
+//! | [`Varint`]                    | `Varint`              |
+
 
 use std::collections::{BTreeMap, HashMap};
 use std::hash::Hash;
@@ -14,31 +63,6 @@ use crate::*;
 ///
 /// In order to convert a Rust value to a non-default Cassandra type, or to convert
 /// a Rust type that doesn't have a default conversion defined, use [`Value::of_type()`].
-///
-/// # Default type mapping
-///
-/// | Rust type                     | gRPC type (types::*)  |
-/// |-------------------------------|-----------------------|
-/// | `i8`                          | `Int`                 |
-/// | `i16`                         | `Int`                 |
-/// | `i32`                         | `Int`                 |
-/// | `i64`                         | `Int`                 |
-/// | `f32`                         | `Float`               |
-/// | `f64`                         | `Double`              |
-/// | `bool`                        | `Boolean`             |
-/// | `String`                      | `String`              |
-/// | `&str`                        | `String`              |
-/// | `Vec<u8>`                     | `Bytes`               |
-/// | `Vec<T>`                      | `List`                |
-/// | `Vec<KeyValue>`               | `Map`                 |
-/// | `HashMap<K, V>`               | `Map`                 |
-/// | `BTreeMap<K, V>`              | `Map                  |
-/// | `(T1, T2, ...)`               | `List`                |
-/// | `stargate_grpc::Decimal`      | `Decimal`             |
-/// | `stargate_grpc::Inet`         | `Inet`                |
-/// | `stargate_grpc::UdtValue`     | `Udt`                 |
-/// | `stargate_grpc::Uuid`         | `Uuid`                |
-/// | `stargate_grpc::Varint`       | `Varint`              |
 ///
 /// # Example
 /// ```
@@ -334,7 +358,7 @@ impl Value {
     ///     Value::list(vec![Value::int(1), Value::int(2)])
     /// );
     /// ```
-    /// See also [`Value::list_of_type()`].
+    /// See also [`Value::list_of()`].
     pub fn list<I, T>(elements: I) -> Value
     where
         I: IntoIterator<Item = T>,
