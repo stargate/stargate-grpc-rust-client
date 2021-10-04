@@ -1,4 +1,4 @@
-//! Automatic conversions from standard Rust types to `Value`
+//! Automatic conversions from standard Rust types to `Value`.
 //!
 //! Values can be obtained generically from commonly used Rust types using
 //! standard Rust [`Into`](std::convert::Into) or [`From`](std::convert::From) traits:
@@ -22,39 +22,38 @@
 //! // let string_value = Value::of_type(types::String, 10); // compile time error
 //! ```
 //! ## Available Conversions
-//! | Rust type                     | gRPC type (types::*)
-//! |-------------------------------|-----------------------
-//! | `i8`                          | `Int`                 |
-//! | `i16`                         | `Int`                 |
-//! | `i32`                         | `Int`                 |
-//! | `i64`                         | `Int`                 |
-//! | `u16`                         | `Int`                 |
-//! | `u32`                         | `Int`, `Date`         |
-//! | `u64`                         | `Time`                |
-//! | `f32`                         | `Float`               |
-//! | `f64`                         | `Double`              |
-//! | `bool`                        | `Boolean`             |
-//! | `String`                      | `String`              |
-//! | `&str`                        | `String`              |
-//! | `Vec<u8>`                     | `Bytes`               |
-//! | `Vec<T>`                      | `List`                |
-//! | `Vec<KeyValue>`               | `Map`                 |
-//! | `HashMap<K, V>`               | `Map`                 |
-//! | `BTreeMap<K, V>`              | `Map`                 |
-//! | `(T1, T2, ...)`               | `List`                |
-//! | [`Decimal`]                   | `Decimal`             |
-//! | [`Inet`]                      | `Inet`                |
-//! | [`UdtValue`]                  | `Udt`                 |
-//! | [`Uuid`]                      | `Uuid`                |
-//! | [`Varint`]                    | `Varint`              |
-
+//! | Rust type                     | gRPC type
+//! |-------------------------------|------------------------------------
+//! | `i8`                          | [`types::Int`]                    |
+//! | `i16`                         | [`types::Int`]                    |
+//! | `i32`                         | [`types::Int`]                    |
+//! | `i64`                         | [`types::Int`]                    |
+//! | `u16`                         | [`types::Int`]                    |
+//! | `u32`                         | [`types::Int`], [`types::Date`]   |
+//! | `u64`                         | [`types::Time`]                   |
+//! | `f32`                         | [`types::Float`]                  |
+//! | `f64`                         | [`types::Double`]                 |
+//! | `bool`                        | [`types::Boolean`]                |
+//! | `String`                      | [`types::String`]                 |
+//! | `&str`                        | [`types::String`]                 |
+//! | `Vec<u8>`                     | [`types::Bytes`]                  |
+//! | `Vec<T>`                      | [`types::List`]                   |
+//! | `Vec<KeyValue>`               | [`types::Map`]                    |
+//! | `HashMap<K, V>`               | [`types::Map`]                    |
+//! | `BTreeMap<K, V>`              | [`types::Map`]                    |
+//! | `(T1, T2, ...)`               | [`types::List`]                   |
+//! | [`proto::Decimal`]            | [`types::Decimal`]                |
+//! | [`proto::Inet`]               | [`types::Inet`]                   |
+//! | [`proto::UdtValue`]           | [`types::Udt`]                    |
+//! | [`proto::Uuid`]               | [`types::Uuid`]                   |
+//! | [`proto::Varint`]             | [`types::Varint`]                 |
 
 use std::collections::{BTreeMap, HashMap};
 use std::hash::Hash;
 
 use itertools::Itertools;
 
-use crate::types::{ConcreteType, List, Map};
+use crate::types::ConcreteType;
 use crate::*;
 
 /// Selects the default Cassandra gRPC value type associated with a Rust type.
@@ -122,19 +121,19 @@ impl DefaultCassandraType for &str {
 impl DefaultCassandraType for Vec<u8> {
     type C = types::Bytes;
 }
-impl DefaultCassandraType for Decimal {
+impl DefaultCassandraType for proto::Decimal {
     type C = types::Decimal;
 }
-impl DefaultCassandraType for Inet {
+impl DefaultCassandraType for proto::Inet {
     type C = types::Inet;
 }
-impl DefaultCassandraType for UdtValue {
+impl DefaultCassandraType for proto::UdtValue {
     type C = types::Udt;
 }
-impl DefaultCassandraType for Uuid {
+impl DefaultCassandraType for proto::Uuid {
     type C = types::Uuid;
 }
-impl DefaultCassandraType for Varint {
+impl DefaultCassandraType for proto::Varint {
     type C = types::Varint;
 }
 
@@ -259,7 +258,7 @@ impl Value {
     /// Creates a Cassandra Null value.
     pub fn null() -> Value {
         Value {
-            inner: Some(value::Inner::Null(value::Null {})),
+            inner: Some(proto::value::Inner::Null(proto::value::Null {})),
         }
     }
 
@@ -270,79 +269,82 @@ impl Value {
     /// To be used only for bind values in queries.
     pub fn unset() -> Value {
         Value {
-            inner: Some(value::Inner::Unset(value::Unset {})),
+            inner: Some(proto::value::Inner::Unset(proto::value::Unset {})),
         }
     }
 
     pub fn boolean(value: bool) -> Value {
         Value {
-            inner: Some(value::Inner::Boolean(value)),
+            inner: Some(proto::value::Inner::Boolean(value)),
         }
     }
 
     pub fn int(value: i64) -> Value {
         Value {
-            inner: Some(value::Inner::Int(value)),
+            inner: Some(proto::value::Inner::Int(value)),
         }
     }
 
     pub fn float(value: f32) -> Value {
         Value {
-            inner: Some(value::Inner::Float(value)),
+            inner: Some(proto::value::Inner::Float(value)),
         }
     }
 
     pub fn double(value: f64) -> Value {
         Value {
-            inner: Some(value::Inner::Double(value)),
+            inner: Some(proto::value::Inner::Double(value)),
         }
     }
 
     pub fn date(value: u32) -> Value {
         Value {
-            inner: Some(value::Inner::Date(value)),
+            inner: Some(proto::value::Inner::Date(value)),
         }
     }
 
     pub fn time(value: u64) -> Value {
         Value {
-            inner: Some(value::Inner::Time(value)),
+            inner: Some(proto::value::Inner::Time(value)),
         }
     }
 
     pub fn uuid(value: Vec<u8>) -> Value {
         Value {
-            inner: Some(value::Inner::Uuid(Uuid { value })),
+            inner: Some(proto::value::Inner::Uuid(proto::Uuid { value })),
         }
     }
 
     pub fn inet(value: Vec<u8>) -> Value {
         Value {
-            inner: Some(value::Inner::Inet(Inet { value })),
+            inner: Some(proto::value::Inner::Inet(proto::Inet { value })),
         }
     }
 
     pub fn bytes(value: Vec<u8>) -> Value {
         Value {
-            inner: Some(value::Inner::Bytes(value)),
+            inner: Some(proto::value::Inner::Bytes(value)),
         }
     }
 
     pub fn varint(value: Vec<u8>) -> Value {
         Value {
-            inner: Some(value::Inner::Varint(Varint { value })),
+            inner: Some(proto::value::Inner::Varint(proto::Varint { value })),
         }
     }
 
     pub fn decimal(scale: u32, value: Vec<u8>) -> Value {
         Value {
-            inner: Some(value::Inner::Decimal(Decimal { scale, value })),
+            inner: Some(proto::value::Inner::Decimal(proto::Decimal {
+                scale,
+                value,
+            })),
         }
     }
 
     pub fn string<S: ToString>(value: S) -> Value {
         Value {
-            inner: Some(value::Inner::String(value.to_string())),
+            inner: Some(proto::value::Inner::String(value.to_string())),
         }
     }
 
@@ -385,7 +387,9 @@ impl Value {
     {
         let elements = elements.into_iter().map(|e| e.into_value()).collect_vec();
         Value {
-            inner: Some(value::Inner::Collection(Collection { elements })),
+            inner: Some(proto::value::Inner::Collection(proto::Collection {
+                elements,
+            })),
         }
     }
 
@@ -438,7 +442,8 @@ impl Value {
     ///
     /// # Example
     /// ```
-    /// use stargate_grpc::{types, Value, Inet};
+    /// use stargate_grpc::{types, Value};
+    /// use stargate_grpc::proto::Inet;
     /// use std::collections::{BTreeMap};
     ///
     /// let mut map = BTreeMap::new();
@@ -467,7 +472,7 @@ impl Value {
             collection.push(v.into_value());
         }
         Value {
-            inner: Some(value::Inner::Collection(Collection {
+            inner: Some(proto::value::Inner::Collection(proto::Collection {
                 elements: collection,
             })),
         }
@@ -498,12 +503,12 @@ impl Value {
             .into_iter()
             .map(|(k, v)| (k.to_string(), v.into()))
             .collect();
-        Value::raw_udt(UdtValue { fields })
+        Value::raw_udt(proto::UdtValue { fields })
     }
 
-    fn raw_udt(value: UdtValue) -> Value {
+    fn raw_udt(value: proto::UdtValue) -> Value {
         Value {
-            inner: Some(value::Inner::Udt(value)),
+            inner: Some(proto::value::Inner::Udt(value)),
         }
     }
 }
@@ -568,11 +573,11 @@ gen_conversion!(&str => types::String; x => Value::string(x.to_string()));
 
 gen_conversion!(Vec<u8> => types::Bytes; x => Value::bytes(x));
 
-gen_conversion!(Decimal => types::Decimal; x => Value::decimal(x.scale, x.value));
-gen_conversion!(Inet => types::Inet; x => Value::inet(x.value));
-gen_conversion!(UdtValue => types::Udt; x => Value::raw_udt(x));
-gen_conversion!(Uuid => types::Uuid; x => Value::uuid(x.value));
-gen_conversion!(Varint => types::Varint; x => Value::varint(x.value));
+gen_conversion!(proto::Decimal => types::Decimal; x => Value::decimal(x.scale, x.value));
+gen_conversion!(proto::Inet => types::Inet; x => Value::inet(x.value));
+gen_conversion!(proto::UdtValue => types::Udt; x => Value::raw_udt(x));
+gen_conversion!(proto::Uuid => types::Uuid; x => Value::uuid(x.value));
+gen_conversion!(proto::Varint => types::Varint; x => Value::varint(x.value));
 
 /// Generates generic conversion from a Rust tuple to `Value`.
 ///
@@ -591,7 +596,7 @@ macro_rules! gen_tuple_conversion {
             }
         }
 
-        impl <$($R),+> IntoValue<List<types::Any>> for ($($R),+)
+        impl <$($R),+> IntoValue<types::List<types::Any>> for ($($R),+)
         where $($R: IntoValue<types::Any>),+
         {
             fn into_value(self) -> Value {
@@ -599,11 +604,11 @@ macro_rules! gen_tuple_conversion {
             }
         }
 
-        impl <$($R),+> From<($($R),+)> for QueryValues
+        impl <$($R),+> From<($($R),+)> for query::QueryValues
         where $($R: IntoValue<types::Any>),+
         {
             fn from(tuple: ($($R),+)) -> Self {
-                QueryValues(vec![$(tuple.$index.into_value()),+])
+                query::QueryValues(vec![$(tuple.$index.into_value()),+])
             }
         }
 
@@ -690,7 +695,7 @@ where
     }
 }
 
-impl<R, C> IntoValue<List<C>> for Vec<R>
+impl<R, C> IntoValue<types::List<C>> for Vec<R>
 where
     R: IntoValue<C>,
 {
@@ -700,7 +705,7 @@ where
     }
 }
 
-impl<RK, RV, CK, CV> IntoValue<Map<CK, CV>> for Vec<(RK, RV)>
+impl<RK, RV, CK, CV> IntoValue<types::Map<CK, CV>> for Vec<(RK, RV)>
 where
     RK: IntoValue<CK>,
     RV: IntoValue<CV>,
@@ -713,7 +718,7 @@ where
     }
 }
 
-impl<RK, RV, CK, CV> IntoValue<Map<CK, CV>> for Vec<KeyValue<RK, RV>>
+impl<RK, RV, CK, CV> IntoValue<types::Map<CK, CV>> for Vec<KeyValue<RK, RV>>
 where
     RK: IntoValue<CK>,
     RV: IntoValue<CV>,
@@ -726,7 +731,7 @@ where
     }
 }
 
-impl<RK, RV, CK, CV> IntoValue<Map<CK, CV>> for BTreeMap<RK, RV>
+impl<RK, RV, CK, CV> IntoValue<types::Map<CK, CV>> for BTreeMap<RK, RV>
 where
     RK: IntoValue<CK> + Ord,
     RV: IntoValue<CV>,
@@ -739,7 +744,7 @@ where
     }
 }
 
-impl<RK, RV, CK, CV> IntoValue<Map<CK, CV>> for HashMap<RK, RV>
+impl<RK, RV, CK, CV> IntoValue<types::Map<CK, CV>> for HashMap<RK, RV>
 where
     RK: IntoValue<CK> + Eq + Hash,
     RV: IntoValue<CV>,
@@ -755,6 +760,8 @@ where
 #[cfg(test)]
 mod test {
     use std::collections::{BTreeMap, HashMap};
+
+    use proto::value::Inner;
 
     use crate::types::{Any, Date, Int, List, Map, Time};
     use crate::*;
@@ -813,14 +820,14 @@ mod test {
 
     #[test]
     fn convert_uuid_into_value() {
-        let uuid = Uuid { value: vec![1, 2] }; // not really valid UUID, but the type is ok
+        let uuid = proto::Uuid { value: vec![1, 2] }; // not really valid UUID, but the type is ok
         let v = Value::from(uuid);
         assert_eq!(v, Value::uuid(vec![1, 2]))
     }
 
     #[test]
     fn convert_inet_into_value() {
-        let inet = Inet {
+        let inet = proto::Inet {
             value: vec![127, 0, 0, 1],
         };
         let v = Value::from(inet);
@@ -829,7 +836,7 @@ mod test {
 
     #[test]
     fn convert_decimal_into_value() {
-        let decimal = Decimal {
+        let decimal = proto::Decimal {
             scale: 2,
             value: vec![10, 0],
         };
@@ -839,7 +846,7 @@ mod test {
 
     #[test]
     fn convert_varint_into_value() {
-        let varint = Varint { value: vec![10, 0] };
+        let varint = proto::Varint { value: vec![10, 0] };
         let v = Value::from(varint);
         assert_eq!(v, Value::varint(vec![10, 0]))
     }
@@ -870,7 +877,7 @@ mod test {
         let tuple = (1, 2, 3, 4, 5, "foo");
         let v = Value::from(tuple);
         match v.inner {
-            Some(value::Inner::Collection(value)) if value.elements.len() == 6 => {}
+            Some(Inner::Collection(value)) if value.elements.len() == 6 => {}
             inner => assert!(false, "Unexpected inner value {:?}", inner),
         }
     }
@@ -969,7 +976,7 @@ mod test {
         map.insert("field2", Value::string("bar"));
         let v = Value::udt(map);
         match v.inner {
-            Some(value::Inner::Udt(value)) if value.fields.len() == 2 => {}
+            Some(Inner::Udt(value)) if value.fields.len() == 2 => {}
             inner => assert!(false, "Unexpected udt inner value {:?}", inner),
         }
     }
@@ -979,10 +986,10 @@ mod test {
         let mut map = HashMap::new();
         map.insert("field1".to_string(), Value::int(1));
         map.insert("field2".to_string(), Value::string("bar"));
-        let udt_value = UdtValue { fields: map };
+        let udt_value = proto::UdtValue { fields: map };
         let v = Value::from(udt_value);
         match v.inner {
-            Some(value::Inner::Udt(value)) if value.fields.len() == 2 => {}
+            Some(Inner::Udt(value)) if value.fields.len() == 2 => {}
             inner => assert!(false, "Unexpected udt inner value {:?}", inner),
         }
     }

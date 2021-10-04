@@ -30,7 +30,7 @@
 //!
 //! ```rust
 //! use std::str::FromStr;
-//! use stargate_grpc::{AuthToken, StargateClient};
+//! use stargate_grpc::client::{AuthToken, StargateClient};
 //!
 //! # async fn connect() -> anyhow::Result<()>{
 //! let token = "00000000-0000-0000-0000-000000000000";  // substitute with an authentication token
@@ -45,7 +45,8 @@
 //! Use `QueryBuilder` to create a query, bind query values and pass query parameters:
 //!
 //! ```rust
-//! use stargate_grpc::{Consistency, QueryBuilder};
+//! use stargate_grpc::proto::Consistency;
+//! use stargate_grpc::query::QueryBuilder;
 //!
 //! let query = QueryBuilder::new("SELECT login, emails FROM users WHERE id = :id")
 //!     .keyspace("test")                           // set the keyspace the query applies to
@@ -57,7 +58,7 @@
 //! Run the query and wait for its results:
 //! ```rust
 //! # use std::convert::TryInto;
-//! # use stargate_grpc::{Query, StargateClient};
+//! # use stargate_grpc::{StargateClient, Query};
 //!
 //! # async fn run_query(client: &mut StargateClient, query: Query) -> anyhow::Result<()> {
 //!
@@ -145,89 +146,35 @@
 //! Refer to the documentation of modules [`from_value`] and [`into_value`].
 //!
 
-
-use std::fmt::{Debug, Display, Formatter};
-
-use prost::DecodeError;
-
-pub use client::*;
-pub use from_value::*;
-pub use into_value::*;
-pub use query::*;
-pub use result::*;
-
 pub mod client;
 pub mod from_value;
 pub mod into_value;
 pub mod query;
 pub mod result;
 
+pub mod error;
 pub mod types;
 
-tonic::include_proto!("stargate");
-
-/// Error thrown when some data received from the wire could not be properly
-/// converted to a desired Rust type.
-#[derive(Clone, Debug)]
-pub struct ConversionError {
-    /// Describes the reason why the conversion failed.
-    pub kind: ConversionErrorKind,
-    /// Debug string of the source value that failed to be converted.
-    pub source: String,
-    /// Name of the target Rust type that the value failed to convert to.
-    pub target_type_name: String,
+/// Structures automatically generated from gRPC protocol definition files located in `api/`.
+pub mod proto {
+    tonic::include_proto!("stargate");
 }
 
-#[derive(Clone, Debug)]
-pub enum ConversionErrorKind {
-    /// When the converter didn't know how to convert one type to another
-    /// because the conversion hasn't been defined.
-    Incompatible,
+pub use client::{AuthToken, StargateClient};
+pub use proto::{Consistency, Query, ResultSet, Row, Value};
+pub use query::QueryBuilder;
 
-    /// When the number of elements in a vector or a tuple
-    /// does not match the expected number of elements.
-    WrongNumberOfItems { actual: usize, expected: usize },
+/// Holds a key and a value pair; used in map representation.
+///
+/// Maps are passed as collections of key-value pairs, where items (0, 2, 4, ...) are keys,
+/// and items (1, 3, 5, ...) are values. This means key-value pairs are not encoded as nested
+/// collections. Hence, in order to receive a map, we must convert it to `Vec<KeyValue<K, V>>`
+/// and *not* into `Vec<(K, V)>`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeyValue<K, V>(pub K, pub V);
 
-    /// When the converter attempted to decode a binary blob,
-    /// but the conversion failed due to invalid data.
-    GrpcDecodeError(DecodeError),
-}
-
-impl ConversionError {
-    fn new<S: Debug, T>(kind: ConversionErrorKind, source: S) -> ConversionError {
-        ConversionError {
-            kind,
-            source: format!("{:?}", source),
-            target_type_name: std::any::type_name::<T>().to_string(),
-        }
-    }
-
-    fn incompatible<S: Debug, T>(source: S) -> ConversionError {
-        Self::new::<S, T>(ConversionErrorKind::Incompatible, source)
-    }
-
-    fn wrong_number_of_items<S: Debug, T>(
-        source: S,
-        actual: usize,
-        expected: usize,
-    ) -> ConversionError {
-        Self::new::<S, T>(
-            ConversionErrorKind::WrongNumberOfItems { actual, expected },
-            source,
-        )
-    }
-
-    fn decode_error<S: Debug, T>(source: S, error: DecodeError) -> ConversionError {
-        Self::new::<S, T>(ConversionErrorKind::GrpcDecodeError(error), source)
-    }
-}
-
-impl Display for ConversionError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Cannot convert value {} to {}",
-            self.source, self.target_type_name
-        )
+impl<K, V> KeyValue<K, V> {
+    pub fn into_tuple(self) -> (K, V) {
+        (self.0, self.1)
     }
 }

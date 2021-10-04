@@ -3,12 +3,13 @@
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 use std::error::Error;
-use std::fmt::Debug;
 use std::hash::Hash;
 
 use itertools::Itertools;
 
-use crate::*;
+use crate::error::ConversionError;
+use crate::proto::{value, Row, Value};
+use crate::{proto, KeyValue};
 
 /// Converts a `Value` to a Rust type.
 ///
@@ -91,13 +92,14 @@ gen_conversion!(u32; value::Inner::Date(x) => x);
 gen_conversion!(u64; value::Inner::Time(x) => x);
 gen_conversion!(f32; value::Inner::Float(x) => x);
 gen_conversion!(f64; value::Inner::Double(x) => x);
-gen_conversion!(Decimal; value::Inner::Decimal(x) => x);
-gen_conversion!(Inet; value::Inner::Inet(x) => x);
 gen_conversion!(String; value::Inner::String(x) => x);
-gen_conversion!(UdtValue; value::Inner::Udt(x) => x);
-gen_conversion!(Uuid; value::Inner::Uuid(x) => x);
-gen_conversion!(Varint; value::Inner::Varint(x) => x);
 gen_conversion!(Vec<u8>; value::Inner::Bytes(x) => x);
+
+gen_conversion!(proto::Decimal; value::Inner::Decimal(x) => x);
+gen_conversion!(proto::Inet; value::Inner::Inet(x) => x);
+gen_conversion!(proto::UdtValue; value::Inner::Udt(x) => x);
+gen_conversion!(proto::Uuid; value::Inner::Uuid(x) => x);
+gen_conversion!(proto::Varint; value::Inner::Varint(x) => x);
 
 /// Counts the number of arguments
 macro_rules! count {
@@ -217,19 +219,6 @@ where
     }
 }
 
-/// Maps are passed as collections of key-value pairs, where items (0, 2, 4, ...) are keys,
-/// and items (1, 3, 5, ...) are values. This means key-value pairs are not encoded as nested
-/// collections. Hence, in order to receive a map, we must convert it to `Vec<KeyValue<K, V>>`
-/// and *not* into `Vec<(K, V)>`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct KeyValue<K, V>(pub K, pub V);
-
-impl<K, V> KeyValue<K, V> {
-    pub fn into_tuple(self) -> (K, V) {
-        (self.0, self.1)
-    }
-}
-
 /// Converts a `Value` representing a map into a vector of key-value pairs.
 /// Order of the items is the same as received from the server.
 impl<K, V> TryFromValue for Vec<KeyValue<K, V>>
@@ -334,17 +323,17 @@ mod test {
     #[test]
     fn convert_value_to_inet() {
         let v = Value::inet(vec![1, 2]);
-        let inet: Inet = v.try_into().unwrap();
-        assert_eq!(inet, Inet { value: vec![1, 2] })
+        let inet: proto::Inet = v.try_into().unwrap();
+        assert_eq!(inet, proto::Inet { value: vec![1, 2] })
     }
 
     #[test]
     fn convert_value_to_decimal() {
         let v = Value::decimal(2, vec![1, 2]);
-        let decimal: Decimal = v.try_into().unwrap();
+        let decimal: proto::Decimal = v.try_into().unwrap();
         assert_eq!(
             decimal,
-            Decimal {
+            proto::Decimal {
                 scale: 2,
                 value: vec![1, 2]
             }
@@ -354,15 +343,15 @@ mod test {
     #[test]
     fn convert_value_to_varint() {
         let v = Value::varint(vec![1, 2]);
-        let varint: Varint = v.try_into().unwrap();
-        assert_eq!(varint, Varint { value: vec![1, 2] })
+        let varint: proto::Varint = v.try_into().unwrap();
+        assert_eq!(varint, proto::Varint { value: vec![1, 2] })
     }
 
     #[test]
     fn convert_value_to_uuid() {
         let v = Value::uuid(vec![1, 2]);
-        let varint: Uuid = v.try_into().unwrap();
-        assert_eq!(varint, Uuid { value: vec![1, 2] })
+        let varint: proto::Uuid = v.try_into().unwrap();
+        assert_eq!(varint, proto::Uuid { value: vec![1, 2] })
     }
 
     #[test]

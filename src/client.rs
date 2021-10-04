@@ -1,12 +1,16 @@
-use crate::stargate_client;
-use regex::Regex;
+//! Enhances the automatically generated gRPC Stargate client with token-based authentication.
+
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
+
+use regex::Regex;
 use tonic::codegen::{InterceptedService, StdError};
 use tonic::metadata::AsciiMetadataValue;
 use tonic::service::Interceptor;
 use tonic::{Request, Status};
+
+use crate::proto::stargate_client;
 
 /// Error returned on an attempt to create an [`AuthToken`] from an invalid string.
 #[derive(Clone, Debug)]
@@ -28,7 +32,6 @@ impl Error for InvalidAuthToken {}
 /// You can obtain the token by sending a POST request with a username and password
 /// to "/v1/auth" on port 8081 of Stargate.
 ///
-/// # Example
 /// <pre>
 /// curl -L -X POST 'http://127.0.0.2:8081/v1/auth' \
 ///      -H 'Content-Type: application/json' \
@@ -39,6 +42,14 @@ impl Error for InvalidAuthToken {}
 ///
 /// {"authToken":"25b538f6-3092-4fd1-8dd4-e73408f2bd60"}
 /// </pre>
+///
+/// # Example
+/// ```rust
+/// use std::str::FromStr;
+/// use stargate_grpc::client::AuthToken;
+///
+/// let token = AuthToken::from_str("4fa77b65-c93b-4711-8cd3-62bfd9c5d411").unwrap();
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct AuthToken(AsciiMetadataValue);
 

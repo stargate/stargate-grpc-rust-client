@@ -1,7 +1,8 @@
-//! Defines structs for describing the gRPC data types that user data passed inside `Value`
-//! should be converted into. These structs do not hold any data, they exist purely for
+//! Structs for describing the types of gRPC data values
+//!
+//! These structs do not hold any data, they exist purely for
 //! describing types. They are needed for constructing type parameters passed to
-//! [`Value::of_type`](crate::Value::of_type) or [`Value::list_of`](crate::Value::list_of)
+//! [`Value::of_type()`](crate::Value::of_type) or [`Value::list_of()`](crate::Value::list_of)
 //! functions.
 //!
 //! # Example

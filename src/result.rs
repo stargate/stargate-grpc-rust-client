@@ -1,14 +1,21 @@
-use crate::{ConversionError, Response, ResultSet, Row, TryFromValue};
+//! Automatic data type conversions and utilities useful for processing query results.
+
+use crate::error::ConversionError;
+use crate::from_value::TryFromValue;
+use crate::proto::{Response, ResultSet, Row};
+
 use std::convert::TryFrom;
 
-/// A handy conversion that let us convert the gRPC response into the `ResultSet`
-/// returned by a query.
-impl TryFrom<tonic::Response<crate::Response>> for ResultSet {
+impl TryFrom<tonic::Response<crate::proto::Response>> for ResultSet {
     type Error = ConversionError;
 
+    /// Converts a gRPC response received from the Stargate coordinator
+    /// into a `ResultSet`.
+    ///
+    /// Will return a `ConversionError` if the response does not contain a `ResultSet` message.
     fn try_from(response: tonic::Response<Response>) -> Result<Self, Self::Error> {
         match &response.get_ref().result {
-            Some(crate::response::Result::ResultSet(payload)) => {
+            Some(crate::proto::response::Result::ResultSet(payload)) => {
                 use prost::Message;
                 let data: &prost_types::Any = payload.data.as_ref().unwrap();
                 ResultSet::decode(data.value.as_slice())
@@ -20,7 +27,6 @@ impl TryFrom<tonic::Response<crate::Response>> for ResultSet {
 }
 
 impl Row {
-
     /// Converts the row containing a single value into the desired type.
     ///
     /// Returns `ConversionError` if the row doesn't contain exactly one value or if a value

@@ -1,6 +1,7 @@
-use crate::{
-    Consistency, ConsistencyValue, IntoValue, Payload, Query, QueryParameters, Value, Values,
-};
+//! Utilities for building queries.
+
+use crate::into_value::IntoValue;
+use crate::proto::{Consistency, Payload, Query, QueryParameters, Value, Values};
 
 /// A wrapper struct allowing us to convert tuples to query values.
 /// It is not possible to define a direct conversion from a tuple to a vector
@@ -20,7 +21,7 @@ impl From<Vec<Value>> for QueryValues {
 ///
 /// # Example
 /// ```
-/// use stargate_grpc::{QueryBuilder, ConsistencyValue, Consistency};
+/// use stargate_grpc::{QueryBuilder, Consistency};
 ///
 /// let query = QueryBuilder::new("SELECT * FROM table WHERE year = :year and month = :month")
 ///     .named_value("year", 2021)
@@ -56,7 +57,7 @@ impl QueryBuilder {
     ///
     /// # Example
     /// ```
-    /// use stargate_grpc::{QueryBuilder, ConsistencyValue, Consistency};
+    /// use stargate_grpc::QueryBuilder;
     ///
     /// let query = QueryBuilder::new("SELECT * FROM table WHERE year = ? and month = ?")
     ///     .value(0, 2021)
@@ -81,7 +82,7 @@ impl QueryBuilder {
     ///
     /// # Example
     /// ```
-    /// use stargate_grpc::{QueryBuilder, ConsistencyValue, Consistency, Value};
+    /// use stargate_grpc::{QueryBuilder, Value};
     ///
     /// let cql = "SELECT * FROM table WHERE year = ? and month = ?";
     ///
@@ -110,7 +111,7 @@ impl QueryBuilder {
     ///
     /// # Example
     /// ```
-    /// use stargate_grpc::{QueryBuilder, ConsistencyValue, Consistency};
+    /// use stargate_grpc::QueryBuilder;
     ///
     /// let query = QueryBuilder::new("SELECT * FROM table WHERE year = :year and month = :month")
     ///     .named_value("year", 2021)
@@ -142,7 +143,7 @@ impl QueryBuilder {
     }
 
     pub fn consistency(mut self, consistency: Consistency) -> Self {
-        self.parameters.consistency = Some(ConsistencyValue {
+        self.parameters.consistency = Some(crate::proto::ConsistencyValue {
             value: consistency.into(),
         });
         self
@@ -168,8 +169,10 @@ impl QueryBuilder {
         self
     }
 
-    pub fn serial_consistency(mut self, consistency: ConsistencyValue) -> Self {
-        self.parameters.serial_consistency = Some(consistency);
+    pub fn serial_consistency(mut self, consistency: Consistency) -> Self {
+        self.parameters.serial_consistency = Some(crate::proto::ConsistencyValue {
+            value: consistency.into(),
+        });
         self
     }
 
