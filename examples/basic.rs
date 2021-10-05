@@ -6,29 +6,48 @@ use anyhow::anyhow;
 
 use stargate_grpc::*;
 
-/// Connects to Stargate and returns a client that can run queries
-async fn connect() -> anyhow::Result<StargateClient> {
+const KEYSPACE: &str = "stargate_example_basic";
+
+/// Returns the URL of the Stargate coordinator we need to connect to.
+fn get_url() -> String {
     let args: Vec<_> = std::env::args().collect();
     let default_url = String::from("http://127.0.0.2:8090");
-    let url = args.get(1).unwrap_or(&default_url).to_string();
+    args.get(1).unwrap_or(&default_url).to_string()
+}
+
+/// Returns the authentication token read from the `SG_TOKEN` environment variable.
+fn get_auth_token() -> anyhow::Result<AuthToken> {
     let token = env::var("SG_TOKEN").map_err(|_| anyhow!("SG_TOKEN not set"))?;
-    let token = AuthToken::from_str(token.as_str())?;
+    Ok(AuthToken::from_str(token.as_str())?)
+}
+
+/// Connects to Stargate and returns a client that can run queries
+async fn connect() -> anyhow::Result<StargateClient> {
+    let url = get_url();
+    let token = get_auth_token()?;
     Ok(StargateClient::connect_with_auth(url, token).await?)
 }
 
 /// Creates the test keyspace and an empty `users` table
 async fn create_schema(client: &mut StargateClient) -> anyhow::Result<()> {
-    let create_keyspace = QueryBuilder::new(
-        "CREATE KEYSPACE IF NOT EXISTS test \
-        WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}",
-    )
-    .build();
-    let create_table = QueryBuilder::new(
-        "CREATE TABLE IF NOT EXISTS users\
-        (id bigint primary key, login varchar, emails list<varchar>)",
-    )
-    .keyspace("test")
-    .build();
+    let create_keyspace = QueryBuilder::new()
+        .query(
+            format!(
+                "CREATE KEYSPACE IF NOT EXISTS {} \
+                    WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': 1}}",
+                KEYSPACE
+            )
+            .as_str(),
+        )
+        .build();
+
+    let create_table = QueryBuilder::new()
+        .keyspace(KEYSPACE)
+        .query(
+            "CREATE TABLE IF NOT EXISTS users \
+                (id bigint primary key, login varchar, emails list<varchar>)",
+        )
+        .build();
 
     client.execute_query(create_keyspace).await?;
     client.execute_query(create_table).await?;
@@ -37,8 +56,9 @@ async fn create_schema(client: &mut StargateClient) -> anyhow::Result<()> {
 
 /// Inserts some sample data into the `users` table
 async fn insert_data(client: &mut StargateClient) -> anyhow::Result<()> {
-    let insert =
-        QueryBuilder::new("INSERT INTO users(id, login, emails) VALUES (?, ?, ?)").keyspace("test");
+    let insert = QueryBuilder::new()
+        .keyspace(KEYSPACE)
+        .query("INSERT INTO users(id, login, emails) VALUES (?, ?, ?)");
 
     for id in 0..10 {
         let login = format!("user_{}", id);
@@ -46,7 +66,7 @@ async fn insert_data(client: &mut StargateClient) -> anyhow::Result<()> {
             format!("{}@example.net", login),
             format!("{}@mail.example.net", login),
         ];
-        let query = insert.clone().values((id, login, emails)).build();
+        let query = insert.clone().bind_many((id, login, emails)).build();
         client.execute_query(query).await?;
     }
     Ok(())
@@ -54,15 +74,20 @@ async fn insert_data(client: &mut StargateClient) -> anyhow::Result<()> {
 
 /// Fetches all rows from the `user` table.
 async fn select_all(client: &mut StargateClient) -> anyhow::Result<ResultSet> {
-    let query = QueryBuilder::new("SELECT id, login, emails FROM test.users").build();
+    let query = QueryBuilder::new()
+        .keyspace(KEYSPACE)
+        .query("SELECT id, login, emails FROM users")
+        .build();
     let result = client.execute_query(query).await?.try_into()?;
     Ok(result)
 }
 
 /// Fetches one row from the table. Demonstrates how to use named values.
 async fn select_one(client: &mut StargateClient, id: i32) -> anyhow::Result<ResultSet> {
-    let query = QueryBuilder::new("SELECT id, login, emails FROM test.users WHERE id = :id")
-        .named_value("id", id)
+    let query = QueryBuilder::new()
+        .keyspace(KEYSPACE)
+        .query("SELECT id, login, emails FROM users WHERE id = :id")
+        .bind_name("id", id)
         .build();
     let result = client.execute_query(query).await?.try_into()?;
     Ok(result)

@@ -42,16 +42,17 @@
 //! ```
 //!
 //! ### Querying
-//! Use `QueryBuilder` to create a query, bind query values and pass query parameters:
+//! Use [`QueryBuilder`] to create a query, bind query values and pass query parameters:
 //!
 //! ```rust
 //! use stargate_grpc::proto::Consistency;
 //! use stargate_grpc::query::QueryBuilder;
 //!
-//! let query = QueryBuilder::new("SELECT login, emails FROM users WHERE id = :id")
+//! let query = QueryBuilder::new()
 //!     .keyspace("test")                           // set the keyspace the query applies to
 //!     .consistency(Consistency::LocalQuorum)      // set consistency level
-//!     .named_value("id", 1000)                    // bind :id to 1000
+//!     .query("SELECT login, emails FROM users WHERE id = :id")
+//!     .bind_name("id", 1000)                      // bind :id to 1000
 //!     .build();                                   // build the Query
 //! ```
 //!
@@ -125,12 +126,13 @@
 //! let heterogeneous_list = vec![Value::int(1), Value::double(3.14)];
 //! ```
 //!
-//! Values can be used in [`QueryBuilder::value`] or [`QueryBuilder::named_value`]:
+//! Values can be used in [`QueryBuilder::bind`] or [`QueryBuilder::bind_name`]:
 //!
 //! ```rust
 //! use stargate_grpc::{QueryBuilder, Value};
-//! let query = QueryBuilder::new("SELECT login, emails FROM users WHERE id = :id")
-//!     .named_value("id", Value::int(1000))
+//! let query = QueryBuilder::new()
+//!     .query("SELECT login, emails FROM users WHERE id = :id")
+//!     .bind_name("id", Value::int(1000))
 //!     .build();
 //! ```
 //!
@@ -162,7 +164,7 @@ pub mod proto {
 
 pub use client::{AuthToken, StargateClient};
 pub use proto::{Consistency, Query, ResultSet, Row, Value};
-pub use query::QueryBuilder;
+pub use query::{BatchBuilder, QueryBuilder};
 
 /// Holds a key and a value pair; used in map representation.
 ///
