@@ -49,6 +49,7 @@
 //! | [`proto::Varint`]             | [`types::Varint`]                 |
 
 use std::collections::{BTreeMap, HashMap};
+use std::convert::TryInto;
 use std::hash::Hash;
 
 use itertools::Itertools;
@@ -133,6 +134,11 @@ impl DefaultCassandraType for proto::UdtValue {
 impl DefaultCassandraType for proto::Uuid {
     type C = types::Uuid;
 }
+#[cfg(feature = "uuid")]
+impl DefaultCassandraType for uuid::Uuid {
+    type C = types::Uuid;
+}
+
 impl DefaultCassandraType for proto::Varint {
     type C = types::Varint;
 }
@@ -309,9 +315,11 @@ impl Value {
         }
     }
 
-    pub fn uuid(value: Vec<u8>) -> Value {
+    pub fn uuid(value: &[u8; 16]) -> Value {
         Value {
-            inner: Some(proto::value::Inner::Uuid(proto::Uuid { value })),
+            inner: Some(proto::value::Inner::Uuid(proto::Uuid {
+                value: value.to_vec(),
+            })),
         }
     }
 
@@ -576,8 +584,11 @@ gen_conversion!(Vec<u8> => types::Bytes; x => Value::bytes(x));
 gen_conversion!(proto::Decimal => types::Decimal; x => Value::decimal(x.scale, x.value));
 gen_conversion!(proto::Inet => types::Inet; x => Value::inet(x.value));
 gen_conversion!(proto::UdtValue => types::Udt; x => Value::raw_udt(x));
-gen_conversion!(proto::Uuid => types::Uuid; x => Value::uuid(x.value));
+gen_conversion!(proto::Uuid => types::Uuid; x => Value::uuid(&x.value.try_into().expect("16 bytes")));
 gen_conversion!(proto::Varint => types::Varint; x => Value::varint(x.value));
+
+#[cfg(feature = "uuid")]
+gen_conversion!(uuid::Uuid => types::Uuid; x => Value::uuid(x.as_bytes()));
 
 /// Generates generic conversion from a Rust tuple to `Value`.
 ///
@@ -820,9 +831,9 @@ mod test {
 
     #[test]
     fn convert_uuid_into_value() {
-        let uuid = proto::Uuid { value: vec![1, 2] }; // not really valid UUID, but the type is ok
+        let uuid = proto::Uuid { value: vec![1; 16] };
         let v = Value::from(uuid);
-        assert_eq!(v, Value::uuid(vec![1, 2]))
+        assert_eq!(v, Value::uuid(&[1; 16]))
     }
 
     #[test]

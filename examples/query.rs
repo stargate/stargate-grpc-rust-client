@@ -1,3 +1,5 @@
+//! Demonstrates connecting, creating schema, inserting data and querying
+
 use std::convert::TryInto;
 use std::env;
 use std::str::FromStr;
@@ -6,7 +8,7 @@ use anyhow::anyhow;
 
 use stargate_grpc::*;
 
-const KEYSPACE: &str = "stargate_example_basic";
+const KEYSPACE: &str = "stargate_example_query";
 
 /// Returns the URL of the Stargate coordinator we need to connect to.
 fn get_url() -> String {

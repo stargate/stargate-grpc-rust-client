@@ -1,4 +1,5 @@
 //! Automatic conversions from `Value` to standard Rust types.
+//!
 
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
@@ -75,7 +76,7 @@ macro_rules! gen_conversion {
         impl TryFromValue for $T {
             fn try_from(value: Value) -> Result<Self, ConversionError> {
                 match value.inner {
-                    $(Some($from) => Ok($to)),+,
+                    $(Some($from) => $to)+,
                     other => Err(ConversionError::incompatible::<_, Self>(other)),
                 }
             }
@@ -86,20 +87,29 @@ macro_rules! gen_conversion {
     }
 }
 
-gen_conversion!(bool; value::Inner::Boolean(x) => x);
-gen_conversion!(i64; value::Inner::Int(x) => x);
-gen_conversion!(u32; value::Inner::Date(x) => x);
-gen_conversion!(u64; value::Inner::Time(x) => x);
-gen_conversion!(f32; value::Inner::Float(x) => x);
-gen_conversion!(f64; value::Inner::Double(x) => x);
-gen_conversion!(String; value::Inner::String(x) => x);
-gen_conversion!(Vec<u8>; value::Inner::Bytes(x) => x);
+gen_conversion!(bool; value::Inner::Boolean(x) => Ok(x));
+gen_conversion!(i64; value::Inner::Int(x) => Ok(x));
+gen_conversion!(u32; value::Inner::Date(x) => Ok(x));
+gen_conversion!(u64; value::Inner::Time(x) => Ok(x));
+gen_conversion!(f32; value::Inner::Float(x) => Ok(x));
+gen_conversion!(f64; value::Inner::Double(x) => Ok(x));
+gen_conversion!(String; value::Inner::String(x) => Ok(x));
+gen_conversion!(Vec<u8>; value::Inner::Bytes(x) => Ok(x));
 
-gen_conversion!(proto::Decimal; value::Inner::Decimal(x) => x);
-gen_conversion!(proto::Inet; value::Inner::Inet(x) => x);
-gen_conversion!(proto::UdtValue; value::Inner::Udt(x) => x);
-gen_conversion!(proto::Uuid; value::Inner::Uuid(x) => x);
-gen_conversion!(proto::Varint; value::Inner::Varint(x) => x);
+gen_conversion!(proto::Decimal; value::Inner::Decimal(x) => Ok(x));
+gen_conversion!(proto::Inet; value::Inner::Inet(x) => Ok(x));
+gen_conversion!(proto::UdtValue; value::Inner::Udt(x) => Ok(x));
+gen_conversion!(proto::Uuid; value::Inner::Uuid(x) => Ok(x));
+gen_conversion!(proto::Varint; value::Inner::Varint(x) => Ok(x));
+
+#[cfg(feature = "uuid")]
+gen_conversion!(uuid::Uuid; value::Inner::Uuid(x) =>
+    uuid::Uuid::from_slice(&x.value)
+        .map_err(|_| {
+            let actual_len = x.value.len();
+            ConversionError::wrong_number_of_items::<_, uuid::Uuid>(x, actual_len, 16)
+        })
+);
 
 /// Counts the number of arguments
 macro_rules! count {
@@ -349,9 +359,14 @@ mod test {
 
     #[test]
     fn convert_value_to_uuid() {
-        let v = Value::uuid(vec![1, 2]);
+        let v = Value::uuid(&[1; 16]);
         let varint: proto::Uuid = v.try_into().unwrap();
-        assert_eq!(varint, proto::Uuid { value: vec![1, 2] })
+        assert_eq!(
+            varint,
+            proto::Uuid {
+                value: [1; 16].to_vec()
+            }
+        )
     }
 
     #[test]

@@ -1,3 +1,5 @@
+//! Demonstrates sending batches of queries
+
 use anyhow::anyhow;
 use std::env;
 use std::str::FromStr;
@@ -59,14 +61,7 @@ async fn create_schema(client: &mut StargateClient) -> anyhow::Result<()> {
 }
 
 /// Inserts a user into both tables with a single batch of statements
-async fn register_user(
-    client: &mut StargateClient,
-    login: &str,
-    id: &mut i64,
-) -> anyhow::Result<i64> {
-    *id += 1;
-    let id = *id;
-
+async fn register_user(client: &mut StargateClient, id: i64, login: &str) -> anyhow::Result<i64> {
     let batch = BatchBuilder::new()
         .keyspace(KEYSPACE)
         .query("INSERT INTO users (id, login, emails) VALUES (:id, :login, :emails)")
@@ -89,8 +84,7 @@ async fn main() -> anyhow::Result<()> {
     create_schema(&mut client).await?;
     println!("Created schema");
     println!("Inserting data...");
-    let mut id = 0;
-    register_user(&mut client, "user", &mut id).await?;
+    register_user(&mut client, 1, "user").await?;
     println!("Done");
     Ok(())
 }
