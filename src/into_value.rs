@@ -51,6 +51,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryInto;
 use std::hash::Hash;
+use std::time::SystemTime;
 
 use itertools::Itertools;
 
@@ -89,51 +90,67 @@ pub trait DefaultCassandraType {
 impl DefaultCassandraType for bool {
     type C = types::Boolean;
 }
+
 impl DefaultCassandraType for i8 {
     type C = types::Int;
 }
+
 impl DefaultCassandraType for i16 {
     type C = types::Int;
 }
+
 impl DefaultCassandraType for i32 {
     type C = types::Int;
 }
+
 impl DefaultCassandraType for i64 {
     type C = types::Int;
 }
+
 impl DefaultCassandraType for u16 {
     type C = types::Int;
 }
+
 impl DefaultCassandraType for u32 {
     type C = types::Int;
 }
+
 impl DefaultCassandraType for f32 {
     type C = types::Float;
 }
+
 impl DefaultCassandraType for f64 {
     type C = types::Double;
 }
+
 impl DefaultCassandraType for String {
     type C = types::String;
 }
+
 impl DefaultCassandraType for &str {
     type C = types::String;
 }
+
 impl DefaultCassandraType for Vec<u8> {
     type C = types::Bytes;
 }
+
 impl DefaultCassandraType for proto::Decimal {
     type C = types::Decimal;
 }
+
 impl DefaultCassandraType for proto::Inet {
     type C = types::Inet;
 }
+
 impl DefaultCassandraType for proto::UdtValue {
     type C = types::Udt;
 }
+
 impl DefaultCassandraType for proto::Uuid {
     type C = types::Uuid;
 }
+
 #[cfg(feature = "uuid")]
 impl DefaultCassandraType for uuid::Uuid {
     type C = types::Uuid;
@@ -141,6 +158,20 @@ impl DefaultCassandraType for uuid::Uuid {
 
 impl DefaultCassandraType for proto::Varint {
     type C = types::Varint;
+}
+
+impl DefaultCassandraType for SystemTime {
+    type C = types::Int;
+}
+
+#[cfg(feature = "chrono")]
+impl<Tz: chrono::TimeZone> DefaultCassandraType for chrono::DateTime<Tz> {
+    type C = types::Int;
+}
+
+#[cfg(feature = "chrono")]
+impl<Tz: chrono::TimeZone> DefaultCassandraType for chrono::Date<Tz> {
+    type C = types::Date;
 }
 
 impl<T> DefaultCassandraType for Option<T>
@@ -223,10 +254,10 @@ impl Value {
     ///     Value::int(2)
     /// ]));
     ///
-    /// let timestamps = Value::of_type(List(Time), vec![1633005636085, 1633005636090]);
-    /// assert_eq!(timestamps, Value::list(vec![
-    ///     Value::time(1633005636085),
-    ///     Value::time(1633005636090)
+    /// let times_since_midnight = Value::of_type(List(Time), vec![1000, 2000]);
+    /// assert_eq!(times_since_midnight, Value::list(vec![
+    ///     Value::time(1000),
+    ///     Value::time(2000)
     /// ]));
     ///
     /// // This wouldn't compile:
@@ -570,8 +601,8 @@ gen_conversion!(u32 => types::Int; x => Value::int(x as i64));
 gen_conversion!(u16 => types::Int; x => Value::int(x as i64));
 gen_conversion!(u8 => types::Int; x => Value::int(x as i64));
 
-gen_conversion!(u64 => types::Time; x => Value::time(x));
 gen_conversion!(u32 => types::Date; x => Value::date(x));
+gen_conversion!(u64 => types::Time; x => Value::time(x));
 
 gen_conversion!(f32 => types::Float; x => Value::float(x));
 gen_conversion!(f64 => types::Double; x => Value::double(x));
@@ -586,6 +617,9 @@ gen_conversion!(proto::Inet => types::Inet; x => Value::inet(x.value));
 gen_conversion!(proto::UdtValue => types::Udt; x => Value::raw_udt(x));
 gen_conversion!(proto::Uuid => types::Uuid; x => Value::uuid(&x.value.try_into().expect("16 bytes")));
 gen_conversion!(proto::Varint => types::Varint; x => Value::varint(x.value));
+
+gen_conversion!(SystemTime => types::Int; x =>
+    Value::int(x.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as i64));
 
 #[cfg(feature = "uuid")]
 gen_conversion!(uuid::Uuid => types::Uuid; x => Value::uuid(x.as_bytes()));
@@ -768,9 +802,25 @@ where
     }
 }
 
+#[cfg(feature = "chrono")]
+impl<Tz: chrono::TimeZone> IntoValue<types::Int> for chrono::DateTime<Tz> {
+    fn into_value(self) -> Value {
+        Value::int(self.timestamp_millis())
+    }
+}
+
+#[cfg(feature = "chrono")]
+impl<Tz: chrono::TimeZone> IntoValue<types::Date> for chrono::Date<Tz> {
+    fn into_value(self) -> Value {
+        use chrono::Datelike;
+        Value::date(self.num_days_from_ce() as u32)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::collections::{BTreeMap, HashMap};
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     use proto::value::Inner;
 
@@ -860,6 +910,52 @@ mod test {
         let varint = proto::Varint { value: vec![10, 0] };
         let v = Value::from(varint);
         assert_eq!(v, Value::varint(vec![10, 0]))
+    }
+
+    #[test]
+    fn convert_system_time_into_value() {
+        let time = SystemTime::now();
+        let unix_time = time.duration_since(UNIX_EPOCH).unwrap().as_millis() as i64;
+        let value = Value::from(time);
+        assert_eq!(value, Value::int(unix_time));
+    }
+
+    #[test]
+    #[cfg(feature = "chrono")]
+    fn convert_chrono_utc_time_into_value() {
+        let time = chrono::Utc::now();
+        let unix_time = time.timestamp_millis() as i64;
+        let value = Value::from(time);
+        assert_eq!(value, Value::int(unix_time));
+    }
+
+    #[test]
+    #[cfg(feature = "chrono")]
+    fn convert_chrono_local_time_into_value() {
+        let time = chrono::Local::now();
+        let unix_time = time.timestamp_millis() as i64;
+        let value = Value::from(time);
+        assert_eq!(value, Value::int(unix_time));
+    }
+
+    #[test]
+    #[cfg(feature = "chrono")]
+    fn convert_chrono_utc_date_into_value() {
+        use chrono::Datelike;
+        let date = chrono::Utc::now().date();
+        let days = date.num_days_from_ce() as u32;
+        let value = Value::from(date);
+        assert_eq!(value, Value::date(days));
+    }
+
+    #[test]
+    #[cfg(feature = "chrono")]
+    fn convert_chrono_local_date_into_value() {
+        use chrono::Datelike;
+        let date = chrono::Local::now().date();
+        let days = date.num_days_from_ce() as u32;
+        let value = Value::from(date);
+        assert_eq!(value, Value::date(days));
     }
 
     #[test]

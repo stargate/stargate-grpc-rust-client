@@ -26,7 +26,7 @@
 //! ### Establishing the connection
 //! The main structure that provides the interface to Stargate is [`StargateClient`].
 //! Pass the Stargate endpoint URL and the authentication token to
-//! [`StargateClient::connect_with_auth()`] to obtain an instance:
+//! [`StargateClient::connect_with_auth`] to obtain an instance:
 //!
 //! ```rust
 //! use std::str::FromStr;
@@ -42,12 +42,10 @@
 //! ```
 //!
 //! ### Querying
-//! Use [`QueryBuilder`] to create a query, bind query values and pass query parameters:
+//! Use a [`QueryBuilder`] to create a query, bind query arguments and pass query parameters:
 //!
 //! ```rust
-//! use stargate_grpc::proto::Consistency;
-//! use stargate_grpc::query::QueryBuilder;
-//!
+//! use stargate_grpc::{Consistency, QueryBuilder};
 //! let query = QueryBuilder::new()
 //!     .keyspace("test")                           // set the keyspace the query applies to
 //!     .consistency(Consistency::LocalQuorum)      // set consistency level
@@ -60,19 +58,21 @@
 //! ```rust
 //! # use std::convert::TryInto;
 //! # use stargate_grpc::{StargateClient, Query};
-//!
 //! # async fn run_query(client: &mut StargateClient, query: Query) -> anyhow::Result<()> {
-//!
 //! use stargate_grpc::ResultSet;
 //! let response = client.execute_query(query).await?;  // send the query and wait for gRPC response
 //! let result_set: ResultSet = response.try_into()?;   // convert the response into ResultSet
-//!
 //! # Ok(())
 //! # }
 //! ```
 //!
+//! If you need to send more than one query in a single request, use a [`BatchBuilder`].
+//! All queries in the batch will share the same parameters, such as
+//! keyspace, consistency level or timestamp. Send the batch for execution with
+//! [`StargateClient::execute_batch`].
+//!
 //! ### Processing the result set
-//! The result set comes back as a collection of rows. A`Row` can be easily unpacked
+//! A [`ResultSet`] comes back as a collection of rows. A [`Row`] can be easily unpacked
 //! into a tuple:
 //
 //! ```rust
@@ -101,6 +101,8 @@
 //! # Ok(())
 //! # }
 //! ```
+//!
+//!
 //!
 //! ## Representation of values
 //!
@@ -145,7 +147,47 @@
 //! ```
 //!
 //! Values can be converted to and from other commonly used Rust types.
-//! Refer to the documentation of modules [`from_value`] and [`into_value`].
+//! For more examples, refer to the documentation of modules [`from_value`] and [`into_value`].
+//!
+//! ### Working with UUIDs
+//! This crate provides only a very lightweight representation of UUIDs: [`proto::Uuid`].
+//! A UUID is internally represented as an vector of bytes.
+//! That struct does not provide any functions to generate nor manipulate the
+//! UUID value, however, it should be fairly easy to convert to from other UUID representations.
+//!
+//! To get support for conversions from and to
+//! [`uuid::UUID`](https://docs.rs/uuid/0.8/uuid/struct.Uuid.html),
+//! bring [`uuid`](https://crates.io/crates/uuid) on the dependency list and enable feature `uuid`.
+//! ```toml
+//! [dependencies]
+//! uuid = "0.8
+//! stargate-grpc = { version = "0.1", features = ["uuid"] }
+//! ```
+//!
+//! ### Working with times, dates and timestamps
+//! This crate doesn't define its own fully-fledged
+//! structures for representing dates, times and timestamps.
+//! It allows an easy integration with external structures instead.
+//!
+//! A time value is internally represented as an `u64` number of nanoseconds elapsed
+//! since midnight.
+//! A date is internally represented as an `u32` number of days elapsed
+//! since Unix epoch. Dates before Unix epoch are not representable.
+//! A timestamp is internally represented as an `i64` number of milliseconds
+//! elapsed since Unix epoch. Timestamps can be negative.
+//! You can convert integer types directly to and from time, date and timestamp values.
+//!
+//! To get automatic conversions to and from
+//! [`chrono::Date`](https://docs.rs/chrono/0.4/chrono/struct.Date.html) and
+//! [`chrono::DateTime`](https://docs.rs/chrono/0.4/chrono/struct.DateTime.html)
+//! include [`chrono`](https://crates.io/crates/chrono) on the dependency list and
+//! enable feature `chrono`.
+//!
+//! ```toml
+//! [dependencies]
+//! chrono = "0.4"
+//! stargate-grpc = { version = "0.1", features = ["chrono"] }
+//! ```
 //!
 
 pub mod client;

@@ -1,10 +1,41 @@
 //! Automatic conversions from `Value` to standard Rust types.
 //!
+//!
+//!
+//! # Converting from `chrono::Date` and `chrono::DateTime`
+//!
+//! In order to be able to convert `chrono` dates and timestamps into `Value`,
+//! add `chrono` crate to dependencies of your project and enable `chrono` feature on this crate.
+//! All `chrono` timezones are supported.
+//!
+//! ## Example
+//! ```rust
+//! # #[cfg(feature = "chrono")] {
+//! # use stargate_grpc::Value;
+//! let timestamp = Value::from(chrono::Utc::now());
+//! let today = Value::from(chrono::Utc::now().date());
+//! # }
+//! ```
+//!
+//! # Converting from `uuid::Uuid`
+//!
+//! In order to be able to convert `uuid` UUIDs into `Value`
+//! add `uuid` crate to dependencies and enable `uuid` feature on this crate.
+//! All UUID types are supported.
+//!
+//! ## Example
+//! ```rust
+//! # #[cfg(feature = "uuid")] {
+//! # use stargate_grpc::Value;
+//! let uuid = Value::from(uuid::Uuid::new_v4());
+//! # }
+//! ```
 
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 use std::error::Error;
 use std::hash::Hash;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use itertools::Itertools;
 
@@ -110,6 +141,48 @@ gen_conversion!(uuid::Uuid; value::Inner::Uuid(x) =>
             ConversionError::wrong_number_of_items::<_, uuid::Uuid>(x, actual_len, 16)
         })
 );
+
+gen_conversion!(SystemTime; value::Inner::Int(ts) => {
+    Ok(UNIX_EPOCH.checked_add(Duration::from_millis(ts as u64)).unwrap())
+});
+
+#[cfg(feature = "chrono")]
+gen_conversion!(chrono::DateTime<chrono::Utc>; value::Inner::Int(millis) => {
+    use chrono::TimeZone;
+    Ok(chrono::Utc.timestamp(
+        millis.div_euclid(1000) as i64,
+        (millis.rem_euclid(1000) * 1_000_000) as u32
+    ))
+});
+
+#[cfg(feature = "chrono")]
+gen_conversion!(chrono::DateTime<chrono::Local>; value::Inner::Int(millis) => {
+    use chrono::TimeZone;
+    Ok(chrono::Local.timestamp(
+        millis.div_euclid(1000) as i64,
+        (millis.rem_euclid(1000) * 1_000_000) as u32
+    ))
+});
+
+#[cfg(feature = "chrono")]
+fn into_naive_date(days: u32) -> Result<chrono::NaiveDate, ConversionError> {
+    use std::convert::TryInto;
+    let err = || ConversionError::out_of_range::<_, chrono::Date<chrono::Local>>(days);
+    let days: i32 = days.try_into().map_err(|_| err())?;
+    chrono::NaiveDate::from_num_days_from_ce_opt(days).ok_or_else(err)
+}
+
+#[cfg(feature = "chrono")]
+gen_conversion!(chrono::Date<chrono::Utc>; value::Inner::Date(days) => {
+    use chrono::TimeZone;
+    Ok(chrono::Utc.from_utc_date(&into_naive_date(days)?))
+});
+
+#[cfg(feature = "chrono")]
+gen_conversion!(chrono::Date<chrono::Local>; value::Inner::Date(days) => {
+    use chrono::TimeZone;
+    Ok(chrono::Local.from_utc_date(&into_naive_date(days)?))
+});
 
 /// Counts the number of arguments
 macro_rules! count {
@@ -360,13 +433,45 @@ mod test {
     #[test]
     fn convert_value_to_uuid() {
         let v = Value::uuid(&[1; 16]);
-        let varint: proto::Uuid = v.try_into().unwrap();
+        let uuid: proto::Uuid = v.try_into().unwrap();
         assert_eq!(
-            varint,
+            uuid,
             proto::Uuid {
                 value: [1; 16].to_vec()
             }
         )
+    }
+
+    #[test]
+    #[cfg(feature = "uuid")]
+    fn convert_value_to_uuid_uuid() {
+        let v = Value::uuid(&[1; 16]);
+        let uuid: uuid::Uuid = v.try_into().unwrap();
+        assert_eq!(uuid.as_bytes(), &[1; 16])
+    }
+
+    #[test]
+    fn convert_value_to_system_time() {
+        let v = Value::int(10000);
+        let time: SystemTime = v.try_into().unwrap();
+        assert_eq!(time.duration_since(UNIX_EPOCH).unwrap().as_millis(), 10000);
+    }
+
+    #[test]
+    #[cfg(feature = "chrono")]
+    fn convert_value_to_chrono_date_time() {
+        let v = Value::int(10000);
+        let time: chrono::DateTime<chrono::Utc> = v.try_into().unwrap();
+        assert_eq!(time.timestamp_millis(), 10000);
+    }
+
+    #[test]
+    #[cfg(feature = "chrono")]
+    fn convert_value_to_chrono_date() {
+        use chrono::Datelike;
+        let v = Value::date(10000);
+        let date: chrono::Date<chrono::Utc> = v.try_into().unwrap();
+        assert_eq!(date.num_days_from_ce(), 10000);
     }
 
     #[test]

@@ -71,6 +71,35 @@ impl QueryBuilder {
         self
     }
 
+    /// Sets all values at once, from a vector or a value that can
+    /// be converted to a vector, e.g. a tuple.
+    ///
+    /// # Example
+    /// ```
+    /// use stargate_grpc::{QueryBuilder, Value};
+    ///
+    /// let cql = "SELECT * FROM table WHERE year = ? and month = ?";
+    ///
+    /// let query1 = QueryBuilder::new()
+    ///     .query(cql)
+    ///     .bind((2021, "October"))
+    ///     .build();
+    ///
+    /// let query2 = QueryBuilder::new()
+    ///     .query(cql)
+    ///     .bind(vec![Value::int(2021), Value::string("October")])
+    ///     .build();
+    ///
+    /// assert_eq!(query1.values, query2.values);
+    /// ```
+    ///
+    /// # Panics
+    /// Will panic if it is called after a call to [`bind_name`](QueryBuilder::bind_name)
+    pub fn bind<I: Into<QueryValues>>(mut self, values: I) -> Self {
+        self.payload.bind(values);
+        self
+    }
+
     /// Sets a value at a given index.
     ///
     /// If the internal vector of values is too small, it is automatically resized to
@@ -83,43 +112,14 @@ impl QueryBuilder {
     ///
     /// let query = QueryBuilder::new()
     ///     .query("SELECT * FROM table WHERE year = ? and month = ?")
-    ///     .bind(0, 2021)
-    ///     .bind(1, "October")
+    ///     .bind_ith(0, 2021)
+    ///     .bind_ith(1, "October")
     ///     .build();
     /// ```
     /// # Panics
     /// Will panic if it is called after a call to [`bind_name`](QueryBuilder::bind_name)
-    pub fn bind<T: Into<Value>>(mut self, index: usize, value: T) -> Self {
-        self.payload.bind(index, value);
-        self
-    }
-
-    /// Sets all values at once, from a vector or a value that can
-    /// be converted to a vector, e.g. a tuple.
-    ///
-    /// # Example
-    /// ```
-    /// use stargate_grpc::{QueryBuilder, Value};
-    ///
-    /// let cql = "SELECT * FROM table WHERE year = ? and month = ?";
-    ///
-    /// let query1 = QueryBuilder::new()
-    ///     .query(cql)
-    ///     .bind_many((2021, "October"))
-    ///     .build();
-    ///
-    /// let query2 = QueryBuilder::new()
-    ///     .query(cql)
-    ///     .bind_many(vec![Value::int(2021), Value::string("October")])
-    ///     .build();
-    ///
-    /// assert_eq!(query1.values, query2.values);
-    /// ```
-    ///
-    /// # Panics
-    /// Will panic if it is called after a call to [`bind_name`](QueryBuilder::bind_name)
-    pub fn bind_many<I: Into<QueryValues>>(mut self, values: I) -> Self {
-        self.payload.bind_many(values);
+    pub fn bind_ith<T: Into<Value>>(mut self, index: usize, value: T) -> Self {
+        self.payload.bind_ith(index, value);
         self
     }
 
@@ -145,6 +145,8 @@ impl QueryBuilder {
     }
 
     /// Sets the keyspace the query will apply to.
+    ///
+    /// See [`QueryParameters::keyspace`].
     pub fn keyspace(mut self, keyspace: &str) -> Self {
         self.parameters.keyspace = Some(keyspace.to_string());
         self
@@ -159,6 +161,7 @@ impl QueryBuilder {
     ///     .query("SELECT * FROM table")
     ///     .consistency(Consistency::One);
     /// ```
+    /// See [`QueryParameters::consistency`].
     pub fn consistency(mut self, consistency: Consistency) -> Self {
         self.parameters.consistency = Some(crate::proto::ConsistencyValue {
             value: consistency.into(),
@@ -167,6 +170,7 @@ impl QueryBuilder {
     }
 
     /// Sets the serial consistency level (if the query is a lightweight transaction).
+    ///
     /// See [`QueryParameters::serial_consistency`].
     pub fn serial_consistency(mut self, consistency: Consistency) -> Self {
         self.parameters.serial_consistency = Some(crate::proto::ConsistencyValue {
@@ -176,6 +180,7 @@ impl QueryBuilder {
     }
 
     /// Sets the maximum number of rows that will be returned in the response.
+    ///
     /// See [`QueryParameters::page_size`].
     pub fn page_size(mut self, size: i32) -> Self {
         self.parameters.page_size = Some(size);
@@ -183,6 +188,7 @@ impl QueryBuilder {
     }
 
     /// Sets a paging state that indicates where to resume iteration in the result set.
+    ///
     /// See [`QueryParameters::paging_state`].
     pub fn paging_state(mut self, paging_state: Vec<u8>) -> Self {
         self.parameters.paging_state = Some(paging_state);
@@ -190,6 +196,7 @@ impl QueryBuilder {
     }
 
     /// Sets whether the server should collect tracing information about the execution of the query.
+    ///
     /// See [`QueryParameters::tracing`].
     pub fn tracing(mut self, tracing: bool) -> Self {
         self.parameters.tracing = tracing;
@@ -197,6 +204,7 @@ impl QueryBuilder {
     }
 
     /// Sets the query timestamp (in microseconds).
+    ///
     /// See [`QueryParameters::timestamp`].
     pub fn timestamp(mut self, timestamp: i64) -> Self {
         self.parameters.timestamp = Some(timestamp);
@@ -234,9 +242,9 @@ impl QueryBuilder {
 ///     .keyspace("example")
 ///     .consistency(Consistency::LocalQuorum)
 ///     .query("INSERT INTO users (id, login, email) VALUES (?, ?, ?)")
-///     .bind_many((0, "admin", "admin@example.net"))
+///     .bind((0, "admin", "admin@example.net"))
 ///     .query("INSERT INTO users_by_login (id, login) VALUES (?, ?)")
-///     .bind_many((0, "admin"))
+///     .bind((0, "admin"))
 ///     .build();
 /// ```
 #[derive(Default, Clone)]
@@ -263,24 +271,24 @@ impl BatchBuilder {
         self
     }
 
+    /// Binds all arguments of the lately added query at once,
+    /// from a vector or a value that can be converted to a vector, e.g. a tuple.
+    ///
+    /// # Panics
+    /// Will panic if it is called after a call to [`bind_name`](BatchBuilder::bind_name)
+    pub fn bind<I: Into<QueryValues>>(mut self, values: I) -> Self {
+        self.payload.bind(values);
+        self
+    }
+
     /// Binds an argument of the recently added query at a given index.
     ///
     /// This function can be called multiple times, to bind several arguments.
     /// If the internal vector of values is too small, it is automatically resized to
     /// so that the `index` is valid, and any previously
     /// unset values are filled with [`Value::unset`].
-    pub fn bind<T: Into<Value>>(mut self, index: usize, value: T) -> Self {
-        self.payload.bind(index, value);
-        self
-    }
-
-    /// Binds all arguments of the lately added query at once,
-    /// from a vector or a value that can be converted to a vector, e.g. a tuple.
-    ///
-    /// # Panics
-    /// Will panic if it is called after a call to [`bind_name`](BatchBuilder::bind_name)
-    pub fn bind_many<I: Into<QueryValues>>(mut self, values: I) -> Self {
-        self.payload.bind_many(values);
+    pub fn bind_ith<T: Into<Value>>(mut self, index: usize, value: T) -> Self {
+        self.payload.bind_ith(index, value);
         self
     }
 
@@ -297,6 +305,7 @@ impl BatchBuilder {
     }
 
     /// Sets the keyspace every query in the batch will apply to.
+    ///
     /// See [`BatchParameters::keyspace`].
     pub fn keyspace(mut self, keyspace: &str) -> Self {
         self.parameters.keyspace = Some(keyspace.to_string());
@@ -304,6 +313,7 @@ impl BatchBuilder {
     }
 
     /// Sets the consistency level of all queries in the batch.
+    ///
     /// See [`BatchParameters::consistency`].
     pub fn consistency(mut self, consistency: Consistency) -> Self {
         self.parameters.consistency = Some(crate::proto::ConsistencyValue {
@@ -313,6 +323,7 @@ impl BatchBuilder {
     }
 
     /// Sets whether the server should collect tracing information about the execution of the batch.
+    ///
     /// See [`BatchParameters::tracing`].
     pub fn tracing(mut self, tracing: bool) -> Self {
         self.parameters.tracing = tracing;
@@ -320,6 +331,7 @@ impl BatchBuilder {
     }
 
     /// Sets the query timestamp (in microseconds).
+    ///
     /// See [`BatchParameters::timestamp`].
     pub fn timestamp(mut self, timestamp: i64) -> Self {
         self.parameters.timestamp = Some(timestamp);
@@ -327,6 +339,7 @@ impl BatchBuilder {
     }
 
     /// Sets the serial consistency level (if the query is a lightweight transaction).
+    ///
     /// See [`BatchParameters::serial_consistency`].
     pub fn serial_consistency(mut self, consistency: Consistency) -> Self {
         self.parameters.serial_consistency = Some(crate::proto::ConsistencyValue {
@@ -344,7 +357,7 @@ impl BatchBuilder {
     }
 
     /// Finalizes building and returns the `Batch` that can be passed to
-    /// [`StargateClient::execute_batch()`](crate::StargateClient::execute_batch).
+    /// [`StargateClient::execute_batch`](crate::StargateClient::execute_batch).
     pub fn build(mut self) -> Batch {
         self.finalize_query();
         Batch {
@@ -372,7 +385,14 @@ struct PayloadBuilder {
 }
 
 impl PayloadBuilder {
-    pub fn bind<T: Into<Value>>(&mut self, index: usize, value: T) {
+    pub fn bind<I: Into<QueryValues>>(&mut self, values: I) {
+        if !self.value_names.is_empty() {
+            panic!("Mixing named with non-named values is not allowed")
+        }
+        self.values.extend(values.into().0);
+    }
+
+    pub fn bind_ith<T: Into<Value>>(&mut self, index: usize, value: T) {
         if !self.value_names.is_empty() {
             panic!("Mixing named with non-named values is not allowed")
         }
@@ -380,13 +400,6 @@ impl PayloadBuilder {
             self.values.resize(index + 1, Value::unset());
         }
         self.values[index] = value.into_value();
-    }
-
-    pub fn bind_many<I: Into<QueryValues>>(&mut self, values: I) {
-        if !self.value_names.is_empty() {
-            panic!("Mixing named with non-named values is not allowed")
-        }
-        self.values.extend(values.into().0);
     }
 
     pub fn bind_name<T: Into<Value>>(&mut self, name: &str, value: T) {

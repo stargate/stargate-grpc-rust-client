@@ -128,7 +128,7 @@ for more details on how to setup Stargate.
 
 4. Run the example:
 
-       cargo run --example basic 
+       cargo run --example query 
        Finished dev [unoptimized + debuginfo] target(s) in 0.04s
        Running `target/debug/examples/basic`
        Connected
@@ -148,3 +148,4 @@ for more details on how to setup Stargate.
        Row with id = 1:
        1 user_1 ["user_1@example.net", "user_1@mail.example.net"]
        
+For more runnable examples see `examples/` directory.

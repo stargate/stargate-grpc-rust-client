@@ -21,6 +21,9 @@ pub enum ConversionErrorKind {
     /// because the conversion hasn't been defined.
     Incompatible,
 
+    /// When the source value is out of range of the target type.
+    OutOfRange,
+
     /// When the number of elements in a vector or a tuple
     /// does not match the expected number of elements.
     WrongNumberOfItems { actual: usize, expected: usize },
@@ -39,11 +42,15 @@ impl ConversionError {
         }
     }
 
-    pub(crate) fn incompatible<S: Debug, T>(source: S) -> ConversionError {
+    pub fn incompatible<S: Debug, T>(source: S) -> ConversionError {
         Self::new::<S, T>(ConversionErrorKind::Incompatible, source)
     }
 
-    pub(crate) fn wrong_number_of_items<S: Debug, T>(
+    pub fn out_of_range<S: Debug, T>(source: S) -> ConversionError {
+        Self::new::<S, T>(ConversionErrorKind::OutOfRange, source)
+    }
+
+    pub fn wrong_number_of_items<S: Debug, T>(
         source: S,
         actual: usize,
         expected: usize,
@@ -54,7 +61,7 @@ impl ConversionError {
         )
     }
 
-    pub(crate) fn decode_error<S: Debug, T>(source: S, error: DecodeError) -> ConversionError {
+    pub fn decode_error<S: Debug, T>(source: S, error: DecodeError) -> ConversionError {
         Self::new::<S, T>(ConversionErrorKind::GrpcDecodeError(error), source)
     }
 }
