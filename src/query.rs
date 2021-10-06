@@ -138,7 +138,7 @@ impl QueryBuilder {
     ///
     /// # Panics
     /// Will panic if mixed with calls to [`bind`](QueryBuilder::bind)
-    /// or [`bind_many`](QueryBuilder::bind_many).
+    /// or [`bind_ith`](QueryBuilder::bind_ith).
     pub fn bind_name<T: Into<Value>>(mut self, name: &str, value: T) -> Self {
         self.payload.bind_name(name, value);
         self
@@ -298,7 +298,7 @@ impl BatchBuilder {
     ///
     /// # Panics
     /// Will panic if mixed with calls to [`bind`](BatchBuilder::bind)
-    /// or [`bind_many`](BatchBuilder::bind_many).
+    /// or [`bind_ith`](BatchBuilder::bind_ith).
     pub fn bind_name<T: Into<Value>>(mut self, name: &str, value: T) -> Self {
         self.payload.bind_name(name, value);
         self
