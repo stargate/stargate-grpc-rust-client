@@ -1,10 +1,10 @@
-//! Automatic conversions from standard Rust types to `Value`.
+//! # Automatic conversions from standard Rust types to `Value`.
 //!
 //! Values can be obtained generically from commonly used Rust types using
 //! standard Rust [`Into`](std::convert::Into) or [`From`](std::convert::From) traits:
 //! ```rust
 //! # use stargate_grpc::Value;
-//!
+//! #
 //! let int_value: Value = 5.into();             // == Value::int(5)
 //! let string_value: Value = "stargate".into(); // == Value::string("stargate")
 //! let list1: Value = vec![1, 2].into();        // == Value::list(vec![Value::int(1), Value::int(2)])
@@ -16,37 +16,118 @@
 //! target types are possible or to make the conversion more type-safe:
 //! ```rust
 //! # use stargate_grpc::{types, Value};
-//!
+//! #
 //! let int_value = Value::of_type(types::Int, 5);
 //! let timestamp_value = Value::of_type(types::Time, 1633005636085);
 //! // let string_value = Value::of_type(types::String, 10); // compile time error
 //! ```
-//! ## Available Conversions
+//! ## Standard conversions
 //! | Rust type                     | gRPC type
 //! |-------------------------------|------------------------------------
-//! | `i8`                          | [`types::Int`]                    |
-//! | `i16`                         | [`types::Int`]                    |
-//! | `i32`                         | [`types::Int`]                    |
-//! | `i64`                         | [`types::Int`]                    |
-//! | `u16`                         | [`types::Int`]                    |
-//! | `u32`                         | [`types::Int`], [`types::Date`]   |
-//! | `u64`                         | [`types::Time`]                   |
-//! | `f32`                         | [`types::Float`]                  |
-//! | `f64`                         | [`types::Double`]                 |
-//! | `bool`                        | [`types::Boolean`]                |
-//! | `String`                      | [`types::String`]                 |
-//! | `&str`                        | [`types::String`]                 |
-//! | `Vec<u8>`                     | [`types::Bytes`]                  |
-//! | `Vec<T>`                      | [`types::List`]                   |
-//! | `Vec<KeyValue>`               | [`types::Map`]                    |
-//! | `HashMap<K, V>`               | [`types::Map`]                    |
-//! | `BTreeMap<K, V>`              | [`types::Map`]                    |
-//! | `(T1, T2, ...)`               | [`types::List`]                   |
-//! | [`proto::Decimal`]            | [`types::Decimal`]                |
-//! | [`proto::Inet`]               | [`types::Inet`]                   |
-//! | [`proto::UdtValue`]           | [`types::Udt`]                    |
-//! | [`proto::Uuid`]               | [`types::Uuid`]                   |
-//! | [`proto::Varint`]             | [`types::Varint`]                 |
+//! | `i8`                          | [`types::Int`]
+//! | `i16`                         | [`types::Int`]
+//! | `i32`                         | [`types::Int`]
+//! | `i64`                         | [`types::Int`]
+//! | `u16`                         | [`types::Int`]
+//! | `u32`                         | [`types::Int`], [`types::Date`]
+//! | `u64`                         | [`types::Time`]
+//! | `f32`                         | [`types::Float`]
+//! | `f64`                         | [`types::Double`]
+//! | `bool`                        | [`types::Boolean`]
+//! | `String`                      | [`types::String`]
+//! | `&str`                        | [`types::String`]
+//! | `std::time::SystemTime`       | [`types::Int`]
+//! | `Vec<u8>`                     | [`types::Bytes`]
+//! | `Vec<T>`                      | [`types::List`]
+//! | `Vec<(K, V)>`                 | [`types::Map`]
+//! | `Vec<KeyValue>`               | [`types::Map`]
+//! | `HashMap<K, V>`               | [`types::Map`]
+//! | `BTreeMap<K, V>`              | [`types::Map`]
+//! | `(T1, T2, ...)`               | [`types::List`]
+//! | [`proto::Decimal`]            | [`types::Decimal`]
+//! | [`proto::Inet`]               | [`types::Inet`]
+//! | [`proto::UdtValue`]           | [`types::Udt`]
+//! | [`proto::Uuid`]               | [`types::Uuid`]
+//! | [`proto::Varint`]             | [`types::Varint`]
+//!
+//!
+//! ## Optional conversions
+//!
+//! The following conversions are provided by features `chrono` and `uuid`:
+//!
+//! | Rust type                   | gRPC type
+//! |-----------------------------|------------------------------------
+//! | `chrono::Date<T>`           | [`types::Date`]
+//! | `chrono::DateTime<T>`       | [`types::Int`]
+//! | `uuid::Uuid`                | [`types::Uuid`]
+//!
+//!
+//! ## Collections
+//!
+//! Elements inside of collections are converted to default `Value` types automatically.
+//! This applies to nested collections as well.
+//!
+//! You may have noticed that this crate defines two types that are not present in the gRPC
+//! protocol: `types::List` and `types::Map`. Collections of both of those types are internally
+//! mapped to an [Inner::Collection](proto::value::Inner::Collection) variant.
+//! However, the distinction between a map and a list is needed in order to allow you to
+//! specify the type of map's keys separately from the type of the values.
+//!
+//! ```rust
+//! use std::collections::HashMap;
+//! use stargate_grpc::{types, Value};
+//!
+//! let mut dates = HashMap::new();
+//! dates.insert("start", 18740);   // days since Unix epoch
+//! dates.insert("end", 18747);
+//!
+//! let date_map = Value::of_type(types::Map(types::String, types::Date), dates);
+//! ```
+//!
+//! By specifying a target type as `types::Map` you're also able to convert a vector of pairs
+//! into a collection representing a map, although the default target type for converting a
+//! `Vec<T>` is a list:
+//!
+//! ```rust
+//! use stargate_grpc::{types, Value};
+//!
+//! let collection1 = vec![("key1", 1), ("key2", 2)];
+//! let collection2 = collection1.clone();
+//!
+//! // Maps to map<string, bigint> on the C* side:
+//! let value_as_map = Value::of_type(types::Map(types::String, types::Int), collection1);
+//! // Maps to list<tuple<string, bigint>> on the C* side:
+//! let value_as_list = Value::of_type(types::List((types::String, types::Int)), collection2);
+//!
+//! assert_ne!(value_as_map, value_as_list)
+//! ```
+//!
+//! ## Converting from `chrono::Date` and `chrono::DateTime`
+//!
+//! In order to be able to convert `chrono` dates and timestamps into `Value`,
+//! add `chrono` crate to dependencies of your project and enable `chrono` feature on this crate.
+//! All `chrono` timezones are supported.
+//!
+//! ```rust
+//! # #[cfg(feature = "chrono")] {
+//! # use stargate_grpc::Value;
+//! let timestamp = Value::from(chrono::Utc::now());
+//! let today = Value::from(chrono::Utc::now().date());
+//! # }
+//! ```
+//!
+//! ## Converting from `uuid::Uuid`
+//!
+//! In order to be able to convert `uuid` UUIDs into `Value`
+//! add `uuid` crate to dependencies and enable `uuid` feature on this crate.
+//! All UUID types are supported.
+//!
+//! ```rust
+//! # #[cfg(feature = "uuid")] {
+//! # use stargate_grpc::Value;
+//! let uuid = Value::from(uuid::Uuid::new_v4());
+//! # }
+
 
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryInto;

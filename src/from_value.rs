@@ -1,35 +1,89 @@
-//! Automatic conversions from `Value` to standard Rust types.
+//! # Automatic conversions from `Value` to standard Rust types.
 //!
+//! You can convert a `Value` into a Rust type by calling [`Value::try_into`].
 //!
+//! Because a `Value` can hold one of many different types, a conversion to a concrete
+//! Rust type may fail with [`ConversionError`] if the actual runtime type of the
+//! value is incompatible.
 //!
-//! # Converting from `chrono::Date` and `chrono::DateTime`
+//! ```
+//! # use stargate_grpc::error::ConversionError;
+//! use stargate_grpc::Value;
 //!
-//! In order to be able to convert `chrono` dates and timestamps into `Value`,
+//! let int: i64 = Value::int(10).try_into()?;
+//! let string: String = Value::string("foo").try_into()?;
+//! let list: Vec<i64> = Value::list(vec![Value::int(1), Value::int(2)]).try_into()?;
+//! let (a, b): (i64, f64) = Value::list(vec![Value::int(1), Value::double(3.14)]).try_into()?;
+//!
+//! # Ok::<(), ConversionError>(())
+//! ```
+//!
+//! ## Available conversions
+//!
+//! gRPC variant  |  Rust types
+//! --------------| --------------------------------------------
+//! `Boolean`     | `bool`
+//! `Bytes`       | `Vec<u8>`
+//! `Inet`        | [`proto::Inet`]
+//! `Int`         | `i64`, `std::time::SystemTime`,`chrono::DateTime<Local>`, `chrono::DateTime<Utc>`
+//! `Double`      | `f64`
+//! `Date`        | `u32`, `chrono::Date<Local>`, `chrono::Date<Utc>`
+//! `Decimal`     | [`proto::Decimal`]
+//! `Float`       | `f32`
+//! `String`      | `String`
+//! `Time`        | `u64`
+//! `Uuid`        | [`proto::Uuid`], `uuid::Uuid`
+//! `Udt`         | [`proto::UdtValue`]
+//! `Varint`      | [`proto::Varint`]
+//! `Collection`  | `Vec<T>`, `HashMap<K, V>`, `BTreeMap<K, V>`, `(T1, T2, ..., Tn)`
+//!
+//! ## Handling nulls
+//!
+//! A `Value` can be a `null` or `unset`. If you try to convert a
+//! `null` or `unset` value to a non-optional Rust type that can't represent a "lack of value", a
+//! `ConversionError` of `ConversionErrorKind::Incompatible` will be returned.
+//!
+//! If you expect nulls, wrap your target type into an `Option`:
+//! ```no_run
+//! # use stargate_grpc::Value;
+//! # use stargate_grpc::error::ConversionError;
+//! let opt_int: Option<i64> = Value::null().try_into()?;  // ok
+//! let int: i64 = Value::null().try_into()?;              // would fail with ConversionError
+//! # Ok::<(), ConversionError>(())
+//! ```
+//!
+//! ## Converting to `chrono::Date` and `chrono::DateTime`
+//!
+//! In order to be able to convert `Value`s into `chrono` dates and timestamps,
 //! add `chrono` crate to dependencies of your project and enable `chrono` feature on this crate.
-//! All `chrono` timezones are supported.
+//! This crate can create only date and time values in the `chrono::Local` and `chrono::Utc`
+//! timezones.
 //!
-//! ## Example
 //! ```rust
+//! # use stargate_grpc::error::ConversionError;
+//! # use stargate_grpc::Value;
 //! # #[cfg(feature = "chrono")] {
-//! # use stargate_grpc::Value;
-//! let timestamp = Value::from(chrono::Utc::now());
-//! let today = Value::from(chrono::Utc::now().date());
+//! use chrono::{DateTime, Utc};
+//! let timestamp: DateTime<Utc> = Value::int(1633478400021).try_into()?;
+//! assert_eq!(timestamp.to_rfc2822(), "Wed, 06 Oct 2021 00:00:00 +0000");
 //! # }
+//! # Ok::<(), ConversionError>(())
 //! ```
 //!
-//! # Converting from `uuid::Uuid`
+//! ## Converting to `uuid::Uuid`
+//! Similarly a `Value` of UUID type can be converted to `uuid::Uuid` once you enable feature
+//! `uuid`.
 //!
-//! In order to be able to convert `uuid` UUIDs into `Value`
-//! add `uuid` crate to dependencies and enable `uuid` feature on this crate.
-//! All UUID types are supported.
-//!
-//! ## Example
 //! ```rust
-//! # #[cfg(feature = "uuid")] {
+//! # use stargate_grpc::error::ConversionError;
 //! # use stargate_grpc::Value;
-//! let uuid = Value::from(uuid::Uuid::new_v4());
+//! # #[cfg(feature = "uuid")] {
+//! let uuid = 0x69415263_a826_4bd0_a0c16558c400d084_u128.to_le_bytes();
+//! let uuid: uuid::Uuid = Value::uuid(&uuid).try_into()?;
 //! # }
+//! # Ok::<(), ConversionError>(())
 //! ```
+//!
 
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;

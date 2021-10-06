@@ -1,9 +1,6 @@
 //! Demonstrates writing and reading `uuid:Uuid` values
 
-use anyhow::anyhow;
 use std::convert::TryInto;
-use std::env;
-use std::str::FromStr;
 use uuid::Uuid;
 
 use connect::*;
@@ -58,7 +55,7 @@ async fn fetch_user(
 async fn main() -> anyhow::Result<()> {
     let mut client = connect().await?;
     println!("Connected");
-    create_keyspace(&mut client, KEYSPACE);
+    create_keyspace(&mut client, KEYSPACE).await?;
     create_schema(&mut client).await?;
     println!("Created schema");
     println!("Inserting data...");
