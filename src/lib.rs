@@ -25,7 +25,7 @@
 //!
 //! ### Establishing the connection
 //! The main structure that provides the interface to Stargate is [`StargateClient`].
-//! Pass the connection and Stargate authentication token to
+//! Pass the channel and Stargate authentication token to
 //! [`StargateClient::with_auth`] to obtain an instance of the client:
 //!
 //! ```rust
@@ -43,8 +43,8 @@
 //! # }
 //! ```
 //!
-//! To connect to [Astra](https://www.datastax.com/products/datastax-astra), you need to enable
-//! TLS on the connection:
+//! In order to connect to [Astra](https://www.datastax.com/products/datastax-astra),
+//! you need to configure a transport channel with TLS. Also make sure to target `https` not `http`:
 //!
 //! ```rust
 //! use std::str::FromStr;
@@ -52,12 +52,12 @@
 //! use stargate_grpc::client::{default_tls_config, AuthToken, StargateClient};
 //!
 //! # async fn connect() -> anyhow::Result<()>{
-//! let url = "https://xxx-...-apps.astra.datastax.com/";  // Astra DB URL
-//! let token = "AstraCS:xxxxxxxxxx...";                   // Astra App token
+//! let url = "https://...-apps.astra.datastax.com/";  // Astra DB URL
+//! let token = "AstraCS:...";                         // Astra App token
 //! let token = AuthToken::from_str(token).unwrap();
 //! let channel = Endpoint::new(url)?
-//!     .tls_config(default_tls_config()?)?                // enable TLS
-//!     .connect().await?;                                 // establish transport to the server
+//!     .tls_config(default_tls_config()?)?            // enable TLS
+//!     .connect().await?;                             // establish transport to the server
 //! let mut client = StargateClient::with_auth(channel, token);
 //! # Ok(())
 //! # }
@@ -69,11 +69,11 @@
 //! ```rust
 //! use stargate_grpc::{Consistency, QueryBuilder};
 //! let query = QueryBuilder::new()
-//!     .keyspace("test")                           // set the keyspace the query applies to
-//!     .consistency(Consistency::LocalQuorum)      // set consistency level
-//!     .query("SELECT login, emails FROM users WHERE id = :id")
-//!     .bind_name("id", 1000)                      // bind :id to 1000
-//!     .build();                                   // build the Query
+//!     .keyspace("test")                              // set the keyspace the query applies to
+//!     .consistency(Consistency::LocalQuorum)         // set consistency level
+//!     .query("SELECT * FROM users WHERE id = :id")   // set CQL query text (required)
+//!     .bind_name("id", 1000)                         // bind :id to 1000
+//!     .build();                                      // build the Query
 //! ```
 //!
 //! Run the query and wait for its results:
@@ -82,8 +82,8 @@
 //! # use stargate_grpc::{StargateClient, Query};
 //! # async fn run_query(client: &mut StargateClient, query: Query) -> anyhow::Result<()> {
 //! use stargate_grpc::ResultSet;
-//! let response = client.execute_query(query).await?;  // send the query and wait for gRPC response
-//! let result_set: ResultSet = response.try_into()?;   // convert the response into ResultSet
+//! let response = client.execute_query(query).await?; // send the query and wait for gRPC response
+//! let result_set: ResultSet = response.try_into()?;  // convert the response into ResultSet
 //! # Ok(())
 //! # }
 //! ```
