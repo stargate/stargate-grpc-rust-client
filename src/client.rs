@@ -18,8 +18,7 @@ pub struct InvalidAuthToken(String);
 impl Display for InvalidAuthToken {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
-            f,
-            "Invalid authentication token value format. Token must be a UUID."
+            f, "Invalid authentication token value format. Must be a valid HTTP header value string."
         )
     }
 }
