@@ -100,12 +100,21 @@ for row in result_set.rows {
        cd stargate-grpc
        cargo build
 
-## Running the example
-For your convenience, the project sources contain an example that demonstrates
-connecting, creating schema, inserting data and querying. You'll need a working instance
+## Running the examples
+For your convenience, this project contains a bunch of examples located in the `examples` directory, 
+which demonstrate connecting, creating schemas, inserting data and querying. You'll need a working instance
 of a Stargate cluster to be able to run it. Refer to the 
 [official Stargate documentation](https://stargate.io/docs/stargate/1.0/developers-guide/install/install_overview.html)
 for more details on how to setup Stargate.
+
+Each example program accepts an URL of the stargate coordinator, 
+the authentication token and the keyspace name:
+
+    cargo run --example <example> [-- [--keyspace <keyspace>] [--token <auth token>] [<url>]] 
+
+The authentication token value can be also given in the `SG_TOKEN` environment variable.
+
+### Connecting to a local Stargate instance
 
 1. Set up Stargate server. Start Cassandra cluster and launch Stargate:
 
@@ -113,7 +122,7 @@ for more details on how to setup Stargate.
        ./starctl --cluster-name stargate --cluster-seed 127.0.0.1 --cluster-version 3.11 --listen 127.0.0.2 \
                  --bind-to-listen-address --simple-snitch
 
-3. Fetch the authentication token and store it in the `SG_TOKEN` environment variable:
+2. Obtain the authentication token:
 
        curl -L -X POST 'http://127.0.0.2:8081/v1/auth' \
             -H 'Content-Type: application/json' \
@@ -123,15 +132,23 @@ for more details on how to setup Stargate.
             }'
               
        {"authToken":"2df7e75d-92aa-4cda-9816-f96ccbc91d80"}
+
+3. Set the authentication token variable:
  
        export SG_TOKEN=2df7e75d-92aa-4cda-9816-f96ccbc91d80
 
-4. Run the example:
+4. Run the `keyspace` example to test the connection and create the test keyspace (default keyspace name: `stargate_examples`)
+
+       cargo run --example keyspace 
+       Connected to http://127.0.0.2:8090
+       Created keyspace stargate_examples
+
+5. Run the other examples:
 
        cargo run --example query 
        Finished dev [unoptimized + debuginfo] target(s) in 0.04s
        Running `target/debug/examples/basic`
-       Connected
+       Connected to http://127.0.0.2:8090
        Created schema
        Inserted data. Now querying.
        All rows:
@@ -148,4 +165,3 @@ for more details on how to setup Stargate.
        Row with id = 1:
        1 user_1 ["user_1@example.net", "user_1@mail.example.net"]
        
-For more runnable examples see `examples/` directory.

@@ -20,7 +20,7 @@ impl Display for InvalidAuthToken {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Invalid authentication token value format. Token must be an UUID."
+            "Invalid authentication token value format. Token must be a UUID."
         )
     }
 }

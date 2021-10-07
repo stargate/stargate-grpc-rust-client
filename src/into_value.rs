@@ -128,7 +128,6 @@
 //! let uuid = Value::from(uuid::Uuid::new_v4());
 //! # }
 
-
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryInto;
 use std::hash::Hash;
