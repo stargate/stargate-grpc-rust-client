@@ -4,7 +4,6 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
-use regex::Regex;
 use tonic::codegen::{InterceptedService, StdError};
 use tonic::metadata::AsciiMetadataValue;
 use tonic::service::Interceptor;
@@ -59,14 +58,9 @@ impl FromStr for AuthToken {
     /// Creates a new authentication token from a String.
     /// This will fail if the string is not a valid UUID.
     fn from_str(s: &str) -> Result<AuthToken, InvalidAuthToken> {
-        let pattern =
-            r"^[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}$";
-        let pattern = Regex::new(pattern).unwrap();
-        if pattern.is_match(s) {
-            Ok(AuthToken(AsciiMetadataValue::from_str(s).unwrap()))
-        } else {
-            Err(InvalidAuthToken(s.to_string()))
-        }
+        let ascii_value =
+            AsciiMetadataValue::from_str(s).map_err(|_| InvalidAuthToken(s.to_string()))?;
+        Ok(AuthToken(ascii_value))
     }
 }
 
