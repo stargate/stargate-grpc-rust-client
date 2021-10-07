@@ -11,9 +11,9 @@ bytes = "1.1"
 itertools = "0.10"
 prost = "0.8"
 prost-types = "0.8"
+rustls-native-certs = "0.5.0"
 tokio-rustls = "0.22"
 tonic = { version = "0.5", features = ["transport", "tls"] }
-webpki-roots = "0.21"
 
 chrono = { version = "0.4", optional = true }
 uuid = { version = "0.8", optional = true }

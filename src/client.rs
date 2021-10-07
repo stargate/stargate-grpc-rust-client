@@ -90,12 +90,14 @@ impl StargateClient {
     }
 }
 
-/// Returns the default tls config with root certificates allowing to connect to Astra
-pub fn default_tls_config() -> ClientTlsConfig {
+/// Returns the default TLS config with root certificates imported from the OS.
+pub fn default_tls_config() -> std::io::Result<ClientTlsConfig> {
     let mut rustls_config = tokio_rustls::rustls::ClientConfig::new();
     rustls_config.alpn_protocols.push(b"h2".to_vec());
-    rustls_config
-        .root_store
-        .add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
-    ClientTlsConfig::default().rustls_client_config(rustls_config)
+    rustls_config.root_store = match rustls_native_certs::load_native_certs() {
+        Ok(root_store) => root_store,
+        Err((Some(root_store), _)) => root_store,
+        Err((None, e)) => return Err(e),
+    };
+    Ok(ClientTlsConfig::default().rustls_client_config(rustls_config))
 }

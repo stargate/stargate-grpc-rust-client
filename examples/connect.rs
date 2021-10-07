@@ -13,7 +13,8 @@ pub mod config;
 pub async fn connect(config: &Config) -> anyhow::Result<StargateClient> {
     let mut endpoint = Endpoint::new(config.url.clone())?;
     if config.tls {
-        endpoint = endpoint.tls_config(default_tls_config())?;
+        let tls_config = default_tls_config()?;
+        endpoint = endpoint.tls_config(tls_config)?;
     }
     let channel = endpoint.connect().await?;
     Ok(StargateClient::with_auth(channel, config.token.clone()))

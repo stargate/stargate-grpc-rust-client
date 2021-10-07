@@ -34,8 +34,8 @@
 //! use stargate_grpc::client::{AuthToken, StargateClient};
 //!
 //! # async fn connect() -> anyhow::Result<()>{
-//! let url = "http://localhost:8090";                   // substitute with a Stargate URL
-//! let token = "00000000-0000-0000-0000-000000000000";  // substitute with an authentication token
+//! let url = "http://localhost:8090";                           // Stargate URL
+//! let token = "00000000-0000-0000-0000-000000000000";          // authentication token
 //! let token = AuthToken::from_str(token).unwrap();
 //! let channel = Endpoint::new(url)?.connect().await?;          // connect to the server
 //! let mut client = StargateClient::with_auth(channel, token);  // create authenticating client
@@ -52,13 +52,13 @@
 //! use stargate_grpc::client::{default_tls_config, AuthToken, StargateClient};
 //!
 //! # async fn connect() -> anyhow::Result<()>{
-//! let url = "http://localhost:8090";                   // substitute with a Stargate URL
-//! let token = "00000000-0000-0000-0000-000000000000";  // substitute with an authentication token
+//! let url = "https://xxx-...-apps.astra.datastax.com/";  // Astra DB URL
+//! let token = "AstraCS:xxxxxxxxxx...";                   // Astra App token
 //! let token = AuthToken::from_str(token).unwrap();
 //! let channel = Endpoint::new(url)?
-//!     .tls_config(default_tls_config())?
-//!     .connect().await?;  // establish transport to the server
-//! let mut client = StargateClient::with_auth(channel, token);   // create authenticating client
+//!     .tls_config(default_tls_config()?)?                // enable TLS
+//!     .connect().await?;                                 // establish transport to the server
+//! let mut client = StargateClient::with_auth(channel, token);
 //! # Ok(())
 //! # }
 //! ```
