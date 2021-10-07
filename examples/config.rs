@@ -5,11 +5,12 @@ use clap::Clap;
 use stargate_grpc::AuthToken;
 
 #[derive(Clap, Debug)]
+#[clap(name = "Stargate Rust gRPC client demo program")]
 pub struct Config {
     #[clap(short('k'), long, default_value = "stargate_examples")]
     pub keyspace: String,
 
-    #[clap(long, env("SG_TOKEN"), parse(try_from_str))]
+    #[clap(short('t'), long, env("SG_TOKEN"), parse(try_from_str))]
     pub token: AuthToken,
 
     #[clap(default_value = "http://127.0.0.2:8090")]
