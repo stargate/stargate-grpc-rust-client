@@ -4,9 +4,10 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
-use tonic::codegen::{InterceptedService, StdError};
+use tonic::codegen::InterceptedService;
 use tonic::metadata::AsciiMetadataValue;
 use tonic::service::Interceptor;
+use tonic::transport::ClientTlsConfig;
 use tonic::{Request, Status};
 
 use crate::proto::stargate_client;
@@ -18,7 +19,8 @@ pub struct InvalidAuthToken(String);
 impl Display for InvalidAuthToken {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
-            f, "Invalid authentication token value format. Must be a valid HTTP header value string."
+            f,
+            "Invalid authentication token value format. Must be a valid HTTP header value string."
         )
     }
 }
@@ -81,18 +83,19 @@ pub type StargateClient =
     stargate_client::StargateClient<InterceptedService<tonic::transport::Channel, AuthToken>>;
 
 impl StargateClient {
-    /// Obtains a new `StargateClient` that attaches the authentication `token` to each request.
-    pub async fn connect_with_auth<D>(
-        dst: D,
-        token: AuthToken,
-    ) -> Result<Self, tonic::transport::Error>
-    where
-        D: std::convert::TryInto<tonic::transport::Endpoint>,
-        D::Error: Into<StdError>,
-    {
-        let conn = tonic::transport::Endpoint::new(dst)?.connect().await?;
-        Ok(stargate_client::StargateClient::with_interceptor(
-            conn, token,
-        ))
+    /// Creates a new `StargateClient` wrapping given channel, attaching the authentication
+    /// token to each request.
+    pub fn with_auth(channel: tonic::transport::Channel, token: AuthToken) -> Self {
+        stargate_client::StargateClient::with_interceptor(channel, token)
     }
+}
+
+/// Returns the default tls config with root certificates allowing to connect to Astra
+pub fn default_tls_config() -> ClientTlsConfig {
+    let mut rustls_config = tokio_rustls::rustls::ClientConfig::new();
+    rustls_config.alpn_protocols.push(b"h2".to_vec());
+    rustls_config
+        .root_store
+        .add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
+    ClientTlsConfig::default().rustls_client_config(rustls_config)
 }

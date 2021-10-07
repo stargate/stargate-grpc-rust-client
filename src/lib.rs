@@ -25,18 +25,40 @@
 //!
 //! ### Establishing the connection
 //! The main structure that provides the interface to Stargate is [`StargateClient`].
-//! Pass the Stargate endpoint URL and the authentication token to
-//! [`StargateClient::connect_with_auth`] to obtain an instance:
+//! Pass the connection and Stargate authentication token to
+//! [`StargateClient::with_auth`] to obtain an instance of the client:
 //!
 //! ```rust
 //! use std::str::FromStr;
+//! use tonic::transport::Endpoint;
 //! use stargate_grpc::client::{AuthToken, StargateClient};
 //!
 //! # async fn connect() -> anyhow::Result<()>{
-//! let token = "00000000-0000-0000-0000-000000000000";  // substitute with an authentication token
 //! let url = "http://localhost:8090";                   // substitute with a Stargate URL
+//! let token = "00000000-0000-0000-0000-000000000000";  // substitute with an authentication token
 //! let token = AuthToken::from_str(token).unwrap();
-//! let mut client = StargateClient::connect_with_auth(url, token).await?;
+//! let channel = Endpoint::new(url)?.connect().await?;          // connect to the server
+//! let mut client = StargateClient::with_auth(channel, token);  // create authenticating client
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! To connect to [Astra](https://www.datastax.com/products/datastax-astra), you need to enable
+//! TLS on the connection:
+//!
+//! ```rust
+//! use std::str::FromStr;
+//! use tonic::transport::Endpoint;
+//! use stargate_grpc::client::{default_tls_config, AuthToken, StargateClient};
+//!
+//! # async fn connect() -> anyhow::Result<()>{
+//! let url = "http://localhost:8090";                   // substitute with a Stargate URL
+//! let token = "00000000-0000-0000-0000-000000000000";  // substitute with an authentication token
+//! let token = AuthToken::from_str(token).unwrap();
+//! let channel = Endpoint::new(url)?
+//!     .tls_config(default_tls_config())?
+//!     .connect().await?;  // establish transport to the server
+//! let mut client = StargateClient::with_auth(channel, token);   // create authenticating client
 //! # Ok(())
 //! # }
 //! ```
