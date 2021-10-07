@@ -111,7 +111,7 @@ for more details on how to setup Stargate.
 Each example program accepts an URL of the stargate coordinator, 
 the authentication token and the keyspace name:
 
-    cargo run --example <example> [-- [--keyspace <keyspace>] [--token <auth token>] [<url>]] 
+    cargo run --example <example> [-- [--keyspace <keyspace>] [--token <auth token>] [--tls] [<url>]] 
 
 The authentication token value can be also given in the `SG_TOKEN` environment variable.
 
@@ -178,7 +178,7 @@ You should be able to connect, but the server will respond with a "Keyspace ... 
 
          cargo run --example \
              query "https://$ASTRA_DB_ID-$ASTRA_DB_REGION.apps.astra-dev.datastax.com/:443" \
-                   --tls
+                   --tls \
                    --token $ASTRA_DB_APPLICATION_TOKEN \
                    --keyspace $ASTRA_DB_KEYSPACE 
 
