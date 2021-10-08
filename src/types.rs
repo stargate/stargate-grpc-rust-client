@@ -2,7 +2,7 @@
 //!
 //! These structs do not hold any data, they exist purely for
 //! describing types. They are needed for constructing type parameters passed to
-//! [`Value::of_type()`](crate::Value::of_type) or [`Value::list_of()`](crate::Value::list_of)
+//! [`Value::of_type`](crate::Value::of_type) or [`Value::list_of`](crate::Value::list_of)
 //! functions.
 //!
 //! # Example
@@ -51,7 +51,7 @@ impl<T> ConcreteType for List<T> {}
 pub struct Map<K, V>(pub K, pub V);
 impl<K, V> ConcreteType for Map<K, V> {}
 
-/// Used in target type specification passed to [`Value::of_type`](crate::Value::of_type())
+/// Used in target type specification passed to [`Value::of_type`](crate::Value::of_type)
 /// to mark that the conversion should generate a `Value` of the default type.
 /// It is handy if we already have a `Value` in the structure to be converted, and we
 /// just want it to be passed-through.

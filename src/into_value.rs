@@ -170,7 +170,7 @@ use crate::*;
 /// `x.into()` or `Value::from(x)`.
 ///
 /// In order to convert a Rust value to a non-default Cassandra type, or to convert
-/// a Rust type that doesn't have a default conversion defined, use [`Value::of_type()`].
+/// a Rust type that doesn't have a default conversion defined, use [`Value::of_type`].
 ///
 /// # Example
 /// ```
@@ -617,7 +617,7 @@ impl Value {
     ///     Value::list(vec![Value::int(1), Value::int(2)])
     /// );
     /// ```
-    /// See also [`Value::list_of()`].
+    /// See also [`Value::list_of`].
     pub fn list<I, T>(elements: I) -> Value
     where
         I: IntoIterator<Item = T>,
@@ -675,6 +675,7 @@ impl Value {
     ///     ])
     /// );
     /// ```
+    /// See also [`Value::map_of`].
     pub fn map<I, K, V>(key_value_pairs: I) -> Value
     where
         I: IntoIterator<Item = (K, V)>,
