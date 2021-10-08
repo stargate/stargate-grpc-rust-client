@@ -366,7 +366,6 @@ pub trait IntoValue<C> {
 }
 
 impl Value {
-
     /// Constructs a CQL boolean value without applying additional conversions.
     /// CQL type: `boolean`.
     pub fn raw_boolean(value: bool) -> Value {
@@ -798,7 +797,6 @@ impl Value {
             .collect();
         Value::raw_udt(fields)
     }
-
 }
 
 impl<R> From<R> for Value

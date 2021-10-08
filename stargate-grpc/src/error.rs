@@ -24,6 +24,9 @@ pub enum ConversionErrorKind {
     /// When the source value is out of range of the target type.
     OutOfRange,
 
+    /// When a required UDT field was not found.
+    FieldNotFound(&'static str),
+
     /// When the number of elements in a vector or a tuple
     /// does not match the expected number of elements.
     WrongNumberOfItems { actual: usize, expected: usize },
@@ -48,6 +51,10 @@ impl ConversionError {
 
     pub fn out_of_range<S: Debug, T>(source: S) -> ConversionError {
         Self::new::<S, T>(ConversionErrorKind::OutOfRange, source)
+    }
+
+    pub fn field_not_found<S: Debug, T>(source: S, field_name: &'static str) -> ConversionError {
+        Self::new::<S, T>(ConversionErrorKind::FieldNotFound(field_name), source)
     }
 
     pub fn wrong_number_of_items<S: Debug, T>(

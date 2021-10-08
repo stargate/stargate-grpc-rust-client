@@ -1,0 +1,16 @@
+[package]
+name = "stargate-grpc-derive"
+description = "Struct mapper for stargate-grpc"
+version = "0.1.0"
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+darling = "0.13"
+quote = "1.0.10"
+syn = "1.0"
+
+[dev-dependencies]
+stargate-grpc = { path = "../stargate-grpc" }

@@ -211,6 +211,14 @@
 //! ```
 //!
 
+pub use client::{AuthToken, StargateClient};
+pub use from_value::TryFromValue;
+pub use into_value::{DefaultGrpcType, IntoValue};
+pub use proto::{Consistency, Query, ResultSet, Row, Value};
+pub use query::{BatchBuilder, QueryBuilder};
+#[cfg(feature = "stargate-grpc-derive")]
+pub use stargate_grpc_derive::*;
+
 pub mod client;
 pub mod from_value;
 pub mod into_value;
@@ -224,10 +232,6 @@ pub mod types;
 pub mod proto {
     tonic::include_proto!("stargate");
 }
-
-pub use client::{AuthToken, StargateClient};
-pub use proto::{Consistency, Query, ResultSet, Row, Value};
-pub use query::{BatchBuilder, QueryBuilder};
 
 /// Holds a key and a value pair; used in map representation.
 ///
