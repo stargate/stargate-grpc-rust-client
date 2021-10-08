@@ -107,7 +107,6 @@
 //! # Ok::<(), ConversionError>(())
 //! ```
 
-
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 use std::error::Error;
