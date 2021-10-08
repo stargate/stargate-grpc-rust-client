@@ -115,8 +115,6 @@ the authentication token and the keyspace name:
 
 The authentication token value can be also given in the `SG_TOKEN` environment variable.
 
-### Connecting to a local Stargate instance
-
 1. Set up Stargate server. Start Cassandra cluster and launch Stargate:
 
        ccm create stargate -v 3.11.8 -n 1 -s -b
@@ -165,21 +163,5 @@ The authentication token value can be also given in the `SG_TOKEN` environment v
        1 user_1 ["user_1@example.net", "user_1@mail.example.net"]
        Row with id = 1:
        1 user_1 ["user_1@example.net", "user_1@mail.example.net"]
-
-### Connecting to Astra (development version only)
-*Caution: The examples don't fully work yet because of
-[this Stargate bug](https://github.com/stargate/stargate/issues/1317).
-You should be able to connect, but the server will respond with a "Keyspace ... doesn't exist" error.*
-
-1. Set up an Astra database [here](https://dev.cloud.datastax.com/).
-2. Go to "Connect" section and obtain `ASTRA_DB_KEYSPACE`, `ASTRA_DB_ID` and `ASTRA_DB_REGION` environment variables. 
-3. Go to "Token Management" and obtain the application token. Save it to `ASTRA_DB_APPLICATION_TOKEN` variable.    
-4. Run the example with:
-
-         cargo run --example \
-             query "https://$ASTRA_DB_ID-$ASTRA_DB_REGION.apps.astra-dev.datastax.com/:443" \
-                   --tls \
-                   --token $ASTRA_DB_APPLICATION_TOKEN \
-                   --keyspace $ASTRA_DB_KEYSPACE 
 
 
