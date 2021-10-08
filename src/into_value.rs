@@ -1,25 +1,48 @@
 //! # Automatic conversions from standard Rust types to `Value`.
 //!
-//! Values can be obtained generically from commonly used Rust types using
+//! Values can be obtained by calling dedicated factory methods:
+//! ```rust
+//! # use stargate_grpc::Value;
+//! #
+//! let int_value = Value::int(5);
+//! let double_value = Value::double(3.14);
+//! let string_value = Value::string("foo");
+//! let inet_value = Value::inet(&[127, 0, 0, 1]);
+//! let bytes_value = Value::bytes(vec![0xff, 0xfe, 0x00]);
+//! let list_value = Value::list(vec![1.41, 3.14]);
+//! let heterogeneous = Value::list(vec![Value::int(1), Value::double(3.14)]);
+//! ```
+//! Values can be also generically created from commonly used Rust types using
 //! standard Rust [`Into`](std::convert::Into) or [`From`](std::convert::From) traits:
 //! ```rust
 //! # use stargate_grpc::Value;
 //! #
-//! let int_value: Value = 5.into();             // == Value::int(5)
-//! let string_value: Value = "stargate".into(); // == Value::string("stargate")
-//! let list1: Value = vec![1, 2].into();        // == Value::list(vec![Value::int(1), Value::int(2)])
-//! let list2: Value = (1, 3.14).into();         // == Value::list(vec![Value::int(1), Value::double(3.14)])
+//! let int_value = Value::from(5);
+//! let int_value: Value = 5.into();
+//!
+//! let string_value = Value::from("stargate");
+//! let string_value: Value = "stargate".into();
+//!
+//! let list1 = Value::from(vec![1, 2]);
+//! let list1: Value = vec![1, 2].into();
+//!
+//! let list2 = Value::from((1, 3.14));
+//! let list2: Value = (1, 3.14).into();
 //! ```
 //!
-//! It is also possible to specify the desired target gRPC type to use [`Value::of_type()`]
-//! to disambiguate when more
-//! target types are possible or to make the conversion more type-safe:
+//! It is also possible to specify the desired target CQL type by using [`Value::of_type`]
+//! to disambiguate when more than one target types are possible:
 //! ```rust
 //! # use stargate_grpc::{types, Value};
 //! #
-//! let int_value = Value::of_type(types::Int, 5);
-//! let timestamp_value = Value::of_type(types::Time, 1633005636085);
-//! // let string_value = Value::of_type(types::String, 10); // compile time error
+//! let bytes = Value::of_type(types::List(types::Bytes), vec![vec![0, 1], vec![2, 3]]);
+//! let ints = Value::of_type(types::List(types::Varint), vec![vec![0, 1], vec![2, 3]]);
+//! assert_ne!(bytes, ints);
+//! ```
+//! Specifying the desired target type is more type safe and may guard you from
+//! sending the data of a wrong type:
+//! ```ignore
+//! let list_of_strings = Value::of_type(types::List(types::String), vec![10]); // compile time error
 //! ```
 //! ## Standard conversions
 //! | Rust type                     | gRPC type
@@ -37,13 +60,16 @@
 //! | `String`                      | [`types::String`]
 //! | `&str`                        | [`types::String`]
 //! | `std::time::SystemTime`       | [`types::Int`]
-//! | `Vec<u8>`                     | [`types::Bytes`]
+//! | `Vec<u8>`                     | [`types::Bytes`, `types::Varint`]
 //! | `Vec<T>`                      | [`types::List`]
 //! | `Vec<(K, V)>`                 | [`types::Map`]
 //! | `Vec<KeyValue>`               | [`types::Map`]
 //! | `HashMap<K, V>`               | [`types::Map`]
 //! | `BTreeMap<K, V>`              | [`types::Map`]
 //! | `(T1, T2, ...)`               | [`types::List`]
+//! | &[u8; 4]                      | [`types::Inet`]
+//! | &[u8; 16]                     | [`types::Inet`]
+//! | &[u8; 16]                     | [`types::Uuid`]
 //! | [`proto::Decimal`]            | [`types::Decimal`]
 //! | [`proto::Inet`]               | [`types::Inet`]
 //! | [`proto::UdtValue`]           | [`types::Udt`]
@@ -127,6 +153,7 @@
 //! # use stargate_grpc::Value;
 //! let uuid = Value::from(uuid::Uuid::new_v4());
 //! # }
+//!
 
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryInto;
@@ -305,6 +332,132 @@ pub trait IntoValue<C> {
 }
 
 impl Value {
+
+    /// Constructs a CQL boolean value without applying additional conversions.
+    /// CQL type: `boolean`.
+    pub fn raw_boolean(value: bool) -> Value {
+        Value {
+            inner: Some(proto::value::Inner::Boolean(value)),
+        }
+    }
+
+    /// Constructs an integer value without applying additional conversions.
+    /// CQL types: `tinyint`, `smallint`, `int`, `bigint`, `counter`, `timestamp`.
+    pub fn raw_int(value: i64) -> Value {
+        Value {
+            inner: Some(proto::value::Inner::Int(value)),
+        }
+    }
+
+    /// Constructs a float value without applying conversions.
+    /// CQL types: `float`.
+    pub fn raw_float(value: f32) -> Value {
+        Value {
+            inner: Some(proto::value::Inner::Float(value)),
+        }
+    }
+
+    /// Constructs a double value without applying additional conversions.
+    /// CQL types: `double`.
+    pub fn raw_double(value: f64) -> Value {
+        Value {
+            inner: Some(proto::value::Inner::Double(value)),
+        }
+    }
+
+    /// Constructs a date value from the number of days since Unix epoch.
+    /// Doesn't apply additional conversions.
+    /// CQL types: `date`.
+    pub fn raw_date(value: u32) -> Value {
+        Value {
+            inner: Some(proto::value::Inner::Date(value)),
+        }
+    }
+
+    /// Constructs a date value from the number of nanoseconds since midnight.
+    /// Doesn't apply additional conversions.
+    /// CQL types: `time`.
+    pub fn raw_time(value: u64) -> Value {
+        Value {
+            inner: Some(proto::value::Inner::Time(value)),
+        }
+    }
+
+    /// Constructs a UUID value from raw bytes without applying additional conversions.
+    /// CQL types: `uuid`, `timeuuid`.
+    pub fn raw_uuid(value: &[u8; 16]) -> Value {
+        Value {
+            inner: Some(proto::value::Inner::Uuid(proto::Uuid {
+                value: value.to_vec(),
+            })),
+        }
+    }
+
+    /// Constructs an internet address value from raw bytes, with applying additional conversions.
+    /// CQL types: `inet`.
+    pub fn raw_inet(value: Vec<u8>) -> Value {
+        Value {
+            inner: Some(proto::value::Inner::Inet(proto::Inet { value })),
+        }
+    }
+
+    /// Constructs a binary blob value by wrapping bytes, without applying additional conversions.
+    /// CQL types: `blob`, `custom`.
+    pub fn raw_bytes(value: Vec<u8>) -> Value {
+        Value {
+            inner: Some(proto::value::Inner::Bytes(value)),
+        }
+    }
+
+    /// Constructs a variable length interger from raw byte representation.
+    /// CQL types: `varint`.
+    pub fn raw_varint(value: Vec<u8>) -> Value {
+        Value {
+            inner: Some(proto::value::Inner::Varint(proto::Varint { value })),
+        }
+    }
+
+    /// Constructs a decimal value from raw mantissa and scale.
+    /// CQL types: `decimal`.
+    pub fn raw_decimal(scale: u32, value: Vec<u8>) -> Value {
+        Value {
+            inner: Some(proto::value::Inner::Decimal(proto::Decimal {
+                scale,
+                value,
+            })),
+        }
+    }
+
+    /// Constructs a string value from any value that can be converted to a String.
+    /// CQL types: `string`, `varchar`
+    pub fn raw_string<S: ToString>(value: S) -> Value {
+        Value {
+            inner: Some(proto::value::Inner::String(value.to_string())),
+        }
+    }
+
+    /// Constructs a collection of values.
+    /// CQL types: `list`, `set`, `map`, `tuple`.
+    pub fn raw_collection(elements: Vec<Value>) -> Value {
+        Value {
+            inner: Some(proto::value::Inner::Collection(proto::Collection {
+                elements,
+            })),
+        }
+    }
+
+    /// Constructs a user defined type value from field values.
+    /// CQL types: user defined types
+    pub fn raw_udt(fields: HashMap<String, Value>) -> Value {
+        Value {
+            inner: Some(proto::value::Inner::Udt(proto::UdtValue { fields })),
+        }
+    }
+
+    /// Converts a value of different type into a `Value`.
+    ///
+    /// Same as [`Value::of_type`] but doesn't require the type argument.
+    /// Used internally to provide default type conversions.
     fn convert<R: IntoValue<C>, C>(value: R) -> Value {
         value.into_value()
     }
@@ -372,7 +525,7 @@ impl Value {
         value.into_value()
     }
 
-    /// Creates a Cassandra Null value.
+    /// Creates a CQL `null` value.
     pub fn null() -> Value {
         Value {
             inner: Some(proto::value::Inner::Null(proto::value::Null {})),
@@ -390,85 +543,70 @@ impl Value {
         }
     }
 
-    pub fn boolean(value: bool) -> Value {
-        Value {
-            inner: Some(proto::value::Inner::Boolean(value)),
-        }
+    /// Constructs a CQL `boolean` value.
+    pub fn boolean(value: impl IntoValue<types::Boolean>) -> Value {
+        value.into_value()
     }
 
-    pub fn int(value: i64) -> Value {
-        Value {
-            inner: Some(proto::value::Inner::Int(value)),
-        }
+    /// Constructs a CQL `tinyint`, `smallint`, `int`, `bigint`, `counter` or `timestamp` value.
+    pub fn int(value: impl IntoValue<types::Int>) -> Value {
+        value.into_value()
     }
 
-    pub fn float(value: f32) -> Value {
-        Value {
-            inner: Some(proto::value::Inner::Float(value)),
-        }
+    /// Constructs a CQL `float` value.
+    pub fn float(value: impl IntoValue<types::Float>) -> Value {
+        value.into_value()
     }
 
-    pub fn double(value: f64) -> Value {
-        Value {
-            inner: Some(proto::value::Inner::Double(value)),
-        }
+    /// Constructs a CQL `double` value.
+    pub fn double(value: impl IntoValue<types::Double>) -> Value {
+        value.into_value()
     }
 
-    pub fn date(value: u32) -> Value {
-        Value {
-            inner: Some(proto::value::Inner::Date(value)),
-        }
+    /// Constructs a CQL `date` value.
+    pub fn date(value: impl IntoValue<types::Date>) -> Value {
+        value.into_value()
     }
 
-    pub fn time(value: u64) -> Value {
-        Value {
-            inner: Some(proto::value::Inner::Time(value)),
-        }
+    /// Constructs a CQL `time` value.
+    pub fn time(value: impl IntoValue<types::Time>) -> Value {
+        value.into_value()
     }
 
-    pub fn uuid(value: &[u8; 16]) -> Value {
-        Value {
-            inner: Some(proto::value::Inner::Uuid(proto::Uuid {
-                value: value.to_vec(),
-            })),
-        }
+    /// Constructs a CQL `uuid` or `timeuuid` value.
+    pub fn uuid(value: impl IntoValue<types::Uuid>) -> Value {
+        value.into_value()
     }
 
-    pub fn inet(value: Vec<u8>) -> Value {
-        Value {
-            inner: Some(proto::value::Inner::Inet(proto::Inet { value })),
-        }
+    /// Constructs a CQL `inet` value.
+    pub fn inet(value: impl IntoValue<types::Inet>) -> Value {
+        value.into_value()
     }
 
-    pub fn bytes(value: Vec<u8>) -> Value {
-        Value {
-            inner: Some(proto::value::Inner::Bytes(value)),
-        }
+    /// Constructs a CQL `blob` or `custom` value.
+    pub fn bytes(value: impl IntoValue<types::Bytes>) -> Value {
+        value.into_value()
     }
 
-    pub fn varint(value: Vec<u8>) -> Value {
-        Value {
-            inner: Some(proto::value::Inner::Varint(proto::Varint { value })),
-        }
+    /// Constructs a CQL `varint` value.
+    pub fn varint(value: impl IntoValue<types::Varint>) -> Value {
+        value.into_value()
     }
 
-    pub fn decimal(scale: u32, value: Vec<u8>) -> Value {
-        Value {
-            inner: Some(proto::value::Inner::Decimal(proto::Decimal {
-                scale,
-                value,
-            })),
-        }
+    /// Construcst a CQL `decimal` value.
+    pub fn decimal(value: impl IntoValue<types::Decimal>) -> Value {
+        value.into_value()
     }
 
-    pub fn string<S: ToString>(value: S) -> Value {
-        Value {
-            inner: Some(proto::value::Inner::String(value.to_string())),
-        }
+    /// Constructs a CQL `ascii`, `varchar` or `text` value.
+    pub fn string(value: impl IntoValue<types::String>) -> Value {
+        value.into_value()
     }
 
-    /// Converts an iterable collection to a `Value` representing a list.
-    /// Items are converted to `Value` using the default conversion.
+    /// Constructs a CQL `list`, `set` or `tuple` value.
+    ///
+    /// Items are converted to `Value` using the default conversion associated
+    /// with their actual type.
     ///
     /// # Example
     /// ```
@@ -488,8 +626,8 @@ impl Value {
         Value::list_of(types::Any, elements)
     }
 
-    /// Converts an iterable collection to a `Value` representing a list of elements of given type.
-    /// Each element of the iterable is converted to a type denoted by type `E`.
+    /// Constructs a CQL `list`, `set` or `tuple` value.
+    /// Allows to specify the target type of the elements.
     ///
     /// # Example
     /// ```
@@ -505,15 +643,15 @@ impl Value {
         T: IntoValue<E>,
     {
         let elements = elements.into_iter().map(|e| e.into_value()).collect_vec();
-        Value {
-            inner: Some(proto::value::Inner::Collection(proto::Collection {
-                elements,
-            })),
-        }
+        Value::raw_collection(elements)
     }
 
-    /// Converts a collection of key-value pairs to a `Value` representing a map.
-    /// Keys and values of the map are converted to a `Value` of the default type.
+    /// Converts a collection of key-value pairs to a CQL `map` value.
+    ///
+    /// Keys and values of the map are converted to `Value` using the default conversions
+    /// associated with their types. Keys may be converted to a different type than values.
+    ///
+    /// CQL type: `map`
     ///
     /// # Type Parameters
     /// - `I`: type of the collection
@@ -546,11 +684,12 @@ impl Value {
         Value::map_of(types::Any, types::Any, key_value_pairs)
     }
 
-    /// Converts a collection of key-value pairs to a `Value` representing a Cassandra map.
-    /// Keys and values of the map are converted to gRPC types specified by `CK` and `CV` types.
+    /// Converts a collection of key-value pairs to a CQL `map` value.
+    /// Allows to specify the target key and value types.
     ///
+    /// Keys and values of the map are converted to CQL types specified by `CK` and `CV` types.
     /// The calling code will not compile if the elements of the map cannot be converted
-    /// to given gRPC types.
+    /// to given CQL types.
     ///
     /// # Type Parameters
     /// - `I`: type of the collection
@@ -566,14 +705,14 @@ impl Value {
     /// use std::collections::{BTreeMap};
     ///
     /// let mut map = BTreeMap::new();
-    /// map.insert(1, Inet { value: vec![127, 0, 0, 1] });
-    /// map.insert(2, Inet { value: vec![127, 0, 0, 2] });
+    /// map.insert(1, &[127, 0, 0, 1]);
+    /// map.insert(2, &[127, 0, 0, 2]);
     ///
     /// assert_eq!(
     ///     Value::map_of(types::Int, types::Inet, map),
     ///     Value::map(vec![
-    ///         (Value::int(1), Value::inet(vec![127, 0, 0, 1])),
-    ///         (Value::int(2), Value::inet(vec![127, 0, 0, 2]))
+    ///         (Value::int(1), Value::inet(&[127, 0, 0, 1])),
+    ///         (Value::int(2), Value::inet(&[127, 0, 0, 2]))
     ///     ])
     /// );
     /// ```
@@ -597,9 +736,9 @@ impl Value {
         }
     }
 
-    /// Converts a collection of key-value pairs into a `Value` representing a Cassandra UDT.
+    /// Converts a collection of key-value pairs into a CQL value of a user defined type.
     ///
-    /// Keys must be convertible to strings anv values must be convertible to `Value`.
+    /// Keys must be convertible to strings and values must be convertible to `Value`.
     ///
     /// # Example
     /// ```
@@ -622,14 +761,9 @@ impl Value {
             .into_iter()
             .map(|(k, v)| (k.to_string(), v.into()))
             .collect();
-        Value::raw_udt(proto::UdtValue { fields })
+        Value::raw_udt(fields)
     }
 
-    fn raw_udt(value: proto::UdtValue) -> Value {
-        Value {
-            inner: Some(proto::value::Inner::Udt(value)),
-        }
-    }
 }
 
 impl<R> From<R> for Value
@@ -669,40 +803,46 @@ macro_rules! gen_conversion {
     };
 }
 
-gen_conversion!(bool => types::Boolean; x => Value::boolean(x));
+gen_conversion!(bool => types::Boolean; x => Value::raw_boolean(x));
 
-gen_conversion!(i64 => types::Int; x => Value::int(x));
-gen_conversion!(i32 => types::Int; x => Value::int(x as i64));
-gen_conversion!(i16 => types::Int; x => Value::int(x as i64));
-gen_conversion!(i8 => types::Int; x => Value::int(x as i64));
+gen_conversion!(i64 => types::Int; x => Value::raw_int(x));
+gen_conversion!(i32 => types::Int; x => Value::raw_int(x as i64));
+gen_conversion!(i16 => types::Int; x => Value::raw_int(x as i64));
+gen_conversion!(i8 => types::Int; x => Value::raw_int(x as i64));
 
 //there is no u64 to Int conversion because it doesn't fit fully in the target range
-gen_conversion!(u32 => types::Int; x => Value::int(x as i64));
-gen_conversion!(u16 => types::Int; x => Value::int(x as i64));
-gen_conversion!(u8 => types::Int; x => Value::int(x as i64));
+gen_conversion!(u32 => types::Int; x => Value::raw_int(x as i64));
+gen_conversion!(u16 => types::Int; x => Value::raw_int(x as i64));
+gen_conversion!(u8 => types::Int; x => Value::raw_int(x as i64));
 
-gen_conversion!(u32 => types::Date; x => Value::date(x));
-gen_conversion!(u64 => types::Time; x => Value::time(x));
+gen_conversion!(u32 => types::Date; x => Value::raw_date(x));
+gen_conversion!(u64 => types::Time; x => Value::raw_time(x));
 
-gen_conversion!(f32 => types::Float; x => Value::float(x));
-gen_conversion!(f64 => types::Double; x => Value::double(x));
+gen_conversion!(f32 => types::Float; x => Value::raw_float(x));
+gen_conversion!(f64 => types::Double; x => Value::raw_double(x));
 
-gen_conversion!(String => types::String; x => Value::string(x));
-gen_conversion!(&str => types::String; x => Value::string(x.to_string()));
+gen_conversion!(String => types::String; x => Value::raw_string(x));
+gen_conversion!(&str => types::String; x => Value::raw_string(x.to_string()));
 
-gen_conversion!(Vec<u8> => types::Bytes; x => Value::bytes(x));
+gen_conversion!(Vec<u8> => types::Bytes; x => Value::raw_bytes(x));
+gen_conversion!(Vec<u8> => types::Varint; x => Value::raw_varint(x));
 
-gen_conversion!(proto::Decimal => types::Decimal; x => Value::decimal(x.scale, x.value));
-gen_conversion!(proto::Inet => types::Inet; x => Value::inet(x.value));
-gen_conversion!(proto::UdtValue => types::Udt; x => Value::raw_udt(x));
-gen_conversion!(proto::Uuid => types::Uuid; x => Value::uuid(&x.value.try_into().expect("16 bytes")));
-gen_conversion!(proto::Varint => types::Varint; x => Value::varint(x.value));
+gen_conversion!(&[u8; 4] => types::Inet; x => Value::raw_inet(x.to_vec()));
+gen_conversion!(&[u8; 16] => types::Inet; x => Value::raw_inet(x.to_vec()));
+gen_conversion!(&[u8; 16] => types::Uuid; x => Value::raw_uuid(x));
+
+gen_conversion!(proto::Decimal => types::Decimal; x => Value::raw_decimal(x.scale, x.value));
+gen_conversion!(proto::Inet => types::Inet; x => Value::raw_inet(x.value));
+gen_conversion!(proto::UdtValue => types::Udt; x => Value::raw_udt(x.fields));
+gen_conversion!(proto::Uuid => types::Uuid; x =>
+    Value::raw_uuid(&x.value.try_into().expect("16 bytes")));
+gen_conversion!(proto::Varint => types::Varint; x => Value::raw_varint(x.value));
 
 gen_conversion!(SystemTime => types::Int; x =>
-    Value::int(x.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as i64));
+    Value::raw_int(x.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as i64));
 
 #[cfg(feature = "uuid")]
-gen_conversion!(uuid::Uuid => types::Uuid; x => Value::uuid(x.as_bytes()));
+gen_conversion!(uuid::Uuid => types::Uuid; x => Value::raw_uuid(x.as_bytes()));
 
 /// Generates generic conversion from a Rust tuple to `Value`.
 ///
@@ -717,7 +857,7 @@ macro_rules! gen_tuple_conversion {
         where $($R: IntoValue<$C>),+
         {
             fn into_value(self) -> Value {
-                Value::list(vec![$(self.$index.into_value()),+])
+                Value::raw_collection(vec![$(self.$index.into_value()),+])
             }
         }
 
@@ -725,7 +865,7 @@ macro_rules! gen_tuple_conversion {
         where $($R: IntoValue<types::Any>),+
         {
             fn into_value(self) -> Value {
-                Value::list(vec![$(self.$index.into_value()),+])
+                Value::raw_collection(vec![$(self.$index.into_value()),+])
             }
         }
 
@@ -826,7 +966,7 @@ where
 {
     fn into_value(self) -> Value {
         let elements = self.into_iter().map(|e| e.into_value()).collect_vec();
-        Value::list(elements)
+        Value::raw_collection(elements)
     }
 }
 
@@ -885,7 +1025,7 @@ where
 #[cfg(feature = "chrono")]
 impl<Tz: chrono::TimeZone> IntoValue<types::Int> for chrono::DateTime<Tz> {
     fn into_value(self) -> Value {
-        Value::int(self.timestamp_millis())
+        Value::raw_int(self.timestamp_millis())
     }
 }
 
@@ -893,7 +1033,7 @@ impl<Tz: chrono::TimeZone> IntoValue<types::Int> for chrono::DateTime<Tz> {
 impl<Tz: chrono::TimeZone> IntoValue<types::Date> for chrono::Date<Tz> {
     fn into_value(self) -> Value {
         use chrono::Datelike;
-        Value::date(self.num_days_from_ce() as u32)
+        Value::raw_date(self.num_days_from_ce() as u32)
     }
 }
 
@@ -967,12 +1107,21 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "uuid")]
+    fn convert_uuid_uuid_into_value() {
+        let uuid = uuid::Uuid::new_v4();
+        let v1 = Value::from(uuid);
+        let v2 = Value::uuid(uuid);
+        assert_eq!(v1, v2)
+    }
+
+    #[test]
     fn convert_inet_into_value() {
         let inet = proto::Inet {
             value: vec![127, 0, 0, 1],
         };
         let v = Value::from(inet);
-        assert_eq!(v, Value::inet(vec![127, 0, 0, 1]))
+        assert_eq!(v, Value::inet(&[127, 0, 0, 1]))
     }
 
     #[test]
@@ -982,7 +1131,7 @@ mod test {
             value: vec![10, 0],
         };
         let v = Value::from(decimal);
-        assert_eq!(v, Value::decimal(2, vec![10, 0]))
+        assert_eq!(v, Value::raw_decimal(2, vec![10, 0]))
     }
 
     #[test]
@@ -996,8 +1145,10 @@ mod test {
     fn convert_system_time_into_value() {
         let time = SystemTime::now();
         let unix_time = time.duration_since(UNIX_EPOCH).unwrap().as_millis() as i64;
-        let value = Value::from(time);
-        assert_eq!(value, Value::int(unix_time));
+        let value1 = Value::from(time);
+        assert_eq!(value1, Value::int(unix_time));
+        let value2 = Value::int(time);
+        assert_eq!(value2, Value::int(unix_time));
     }
 
     #[test]
@@ -1005,8 +1156,10 @@ mod test {
     fn convert_chrono_utc_time_into_value() {
         let time = chrono::Utc::now();
         let unix_time = time.timestamp_millis() as i64;
-        let value = Value::from(time);
-        assert_eq!(value, Value::int(unix_time));
+        let value1 = Value::from(time);
+        assert_eq!(value1, Value::int(unix_time));
+        let value2 = Value::int(time);
+        assert_eq!(value2, Value::int(unix_time));
     }
 
     #[test]
@@ -1025,6 +1178,8 @@ mod test {
         let date = chrono::Utc::now().date();
         let days = date.num_days_from_ce() as u32;
         let value = Value::from(date);
+        assert_eq!(value, Value::date(days));
+        let value = Value::date(date);
         assert_eq!(value, Value::date(days));
     }
 

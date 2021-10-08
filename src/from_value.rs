@@ -64,7 +64,7 @@
 //! # use stargate_grpc::Value;
 //! # #[cfg(feature = "chrono")] {
 //! use chrono::{DateTime, Utc};
-//! let timestamp: DateTime<Utc> = Value::int(1633478400021).try_into()?;
+//! let timestamp: DateTime<Utc> = Value::int(1633478400021_i64).try_into()?;
 //! assert_eq!(timestamp.to_rfc2822(), "Wed, 06 Oct 2021 00:00:00 +0000");
 //! # }
 //! # Ok::<(), ConversionError>(())
@@ -79,7 +79,7 @@
 //! # use stargate_grpc::Value;
 //! # #[cfg(feature = "uuid")] {
 //! let uuid = 0x69415263_a826_4bd0_a0c16558c400d084_u128.to_le_bytes();
-//! let uuid: uuid::Uuid = Value::uuid(&uuid).try_into()?;
+//! let uuid: uuid::Uuid = Value::raw_uuid(&uuid).try_into()?;
 //! # }
 //! # Ok::<(), ConversionError>(())
 //! ```
@@ -459,14 +459,14 @@ mod test {
 
     #[test]
     fn convert_value_to_inet() {
-        let v = Value::inet(vec![1, 2]);
+        let v = Value::raw_inet(vec![1, 2]);
         let inet: proto::Inet = v.try_into().unwrap();
         assert_eq!(inet, proto::Inet { value: vec![1, 2] })
     }
 
     #[test]
     fn convert_value_to_decimal() {
-        let v = Value::decimal(2, vec![1, 2]);
+        let v = Value::raw_decimal(2, vec![1, 2]);
         let decimal: proto::Decimal = v.try_into().unwrap();
         assert_eq!(
             decimal,
@@ -479,14 +479,14 @@ mod test {
 
     #[test]
     fn convert_value_to_varint() {
-        let v = Value::varint(vec![1, 2]);
+        let v = Value::raw_varint(vec![1, 2]);
         let varint: proto::Varint = v.try_into().unwrap();
         assert_eq!(varint, proto::Varint { value: vec![1, 2] })
     }
 
     #[test]
     fn convert_value_to_uuid() {
-        let v = Value::uuid(&[1; 16]);
+        let v = Value::raw_uuid(&[1; 16]);
         let uuid: proto::Uuid = v.try_into().unwrap();
         assert_eq!(
             uuid,
@@ -499,7 +499,7 @@ mod test {
     #[test]
     #[cfg(feature = "uuid")]
     fn convert_value_to_uuid_uuid() {
-        let v = Value::uuid(&[1; 16]);
+        let v = Value::raw_uuid(&[1; 16]);
         let uuid: uuid::Uuid = v.try_into().unwrap();
         assert_eq!(uuid.as_bytes(), &[1; 16])
     }
