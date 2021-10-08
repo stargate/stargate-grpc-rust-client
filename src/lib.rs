@@ -46,11 +46,14 @@
 //! If the server requires a secure connection, you need to enable TLS:
 //!
 //! ```rust
+//! # use std::str::FromStr;
 //! # use tonic::transport::Endpoint;
 //! # use stargate_grpc::client::{default_tls_config, AuthToken, StargateClient};
 //! #
 //! # async fn connect() -> anyhow::Result<()>{
-//! // ...
+//! # let url = "http://localhost:8090";
+//! # let token = "00000000-0000-0000-0000-000000000000";
+//! # let token = AuthToken::from_str(token).unwrap();
 //! let channel = Endpoint::new(url)?
 //!     .tls_config(default_tls_config()?)?
 //!     .connect().await?;
