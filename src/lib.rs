@@ -43,21 +43,17 @@
 //! # }
 //! ```
 //!
-//! In order to connect to [Astra](https://www.datastax.com/products/datastax-astra),
-//! you need to configure a transport channel with TLS. Also make sure to target `https` not `http`:
+//! If the server requires a secure connection, you need to enable TLS:
 //!
 //! ```rust
-//! use std::str::FromStr;
-//! use tonic::transport::Endpoint;
-//! use stargate_grpc::client::{default_tls_config, AuthToken, StargateClient};
-//!
+//! # use tonic::transport::Endpoint;
+//! # use stargate_grpc::client::{default_tls_config, AuthToken, StargateClient};
+//! #
 //! # async fn connect() -> anyhow::Result<()>{
-//! let url = "https://...-apps.astra.datastax.com/";  // Astra DB URL
-//! let token = "AstraCS:...";                         // Astra App token
-//! let token = AuthToken::from_str(token).unwrap();
+//! // ...
 //! let channel = Endpoint::new(url)?
-//!     .tls_config(default_tls_config()?)?            // enable TLS
-//!     .connect().await?;                             // establish transport to the server
+//!     .tls_config(default_tls_config()?)?
+//!     .connect().await?;
 //! let mut client = StargateClient::with_auth(channel, token);
 //! # Ok(())
 //! # }
