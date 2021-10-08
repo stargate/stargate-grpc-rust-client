@@ -153,6 +153,40 @@
 //! # use stargate_grpc::Value;
 //! let uuid = Value::from(uuid::Uuid::new_v4());
 //! # }
+//!```
+//!
+//! ## Custom conversions
+//! You can make any type convertible to `Value` by implementing the [`IntoValue`] trait.
+//! Use one of `Value::raw_` methods to construct the actual value.
+//!
+//! Provide a [`DefaultGrpcType`] to make the conversion to desired gRPC type be chosen
+//! automatically even when the target value type is not known.
+//! If the default type is specified, you'll also get implementations of appropriate
+//! [`std::convert::From`] and [`std::convert::Into`] traits for free.
+//!
+//! For example, let's define such conversion from a custom `Login` struct` that wraps a `String`:
+//!```
+//! use stargate_grpc::into_value::{DefaultGrpcType, IntoValue};
+//! use stargate_grpc::{types, Value};
+//!
+//! struct Login(String);
+//!
+//! impl IntoValue<types::String> for Login {
+//!    fn into_value(self) -> Value {
+//!        Value::raw_string(self.0)
+//!    }
+//! }
+//!
+//! impl DefaultGrpcType for Login {
+//!    type C = types::String;
+//! }
+//!
+//! let login = Login("login".to_string());
+//! assert_eq!(Value::string(login), Value::string("login"));
+//!
+//! let login = Login("login".to_string());
+//! assert_eq!(Value::from(login), Value::string("login"));
+//! ```
 //!
 
 use std::collections::{BTreeMap, HashMap};
@@ -189,134 +223,134 @@ use crate::*;
 /// assert_eq!(none, Value::null());
 ///
 /// ```
-pub trait DefaultCassandraType {
+pub trait DefaultGrpcType {
     /// gRPC type, must be set to one of the types defined in the [`types`](crate::types) module.
     type C;
 }
 
-impl DefaultCassandraType for bool {
+impl DefaultGrpcType for bool {
     type C = types::Boolean;
 }
 
-impl DefaultCassandraType for i8 {
+impl DefaultGrpcType for i8 {
     type C = types::Int;
 }
 
-impl DefaultCassandraType for i16 {
+impl DefaultGrpcType for i16 {
     type C = types::Int;
 }
 
-impl DefaultCassandraType for i32 {
+impl DefaultGrpcType for i32 {
     type C = types::Int;
 }
 
-impl DefaultCassandraType for i64 {
+impl DefaultGrpcType for i64 {
     type C = types::Int;
 }
 
-impl DefaultCassandraType for u16 {
+impl DefaultGrpcType for u16 {
     type C = types::Int;
 }
 
-impl DefaultCassandraType for u32 {
+impl DefaultGrpcType for u32 {
     type C = types::Int;
 }
 
-impl DefaultCassandraType for f32 {
+impl DefaultGrpcType for f32 {
     type C = types::Float;
 }
 
-impl DefaultCassandraType for f64 {
+impl DefaultGrpcType for f64 {
     type C = types::Double;
 }
 
-impl DefaultCassandraType for String {
+impl DefaultGrpcType for String {
     type C = types::String;
 }
 
-impl DefaultCassandraType for &str {
+impl DefaultGrpcType for &str {
     type C = types::String;
 }
 
-impl DefaultCassandraType for Vec<u8> {
+impl DefaultGrpcType for Vec<u8> {
     type C = types::Bytes;
 }
 
-impl DefaultCassandraType for proto::Decimal {
+impl DefaultGrpcType for proto::Decimal {
     type C = types::Decimal;
 }
 
-impl DefaultCassandraType for proto::Inet {
+impl DefaultGrpcType for proto::Inet {
     type C = types::Inet;
 }
 
-impl DefaultCassandraType for proto::UdtValue {
+impl DefaultGrpcType for proto::UdtValue {
     type C = types::Udt;
 }
 
-impl DefaultCassandraType for proto::Uuid {
+impl DefaultGrpcType for proto::Uuid {
     type C = types::Uuid;
 }
 
 #[cfg(feature = "uuid")]
-impl DefaultCassandraType for uuid::Uuid {
+impl DefaultGrpcType for uuid::Uuid {
     type C = types::Uuid;
 }
 
-impl DefaultCassandraType for proto::Varint {
+impl DefaultGrpcType for proto::Varint {
     type C = types::Varint;
 }
 
-impl DefaultCassandraType for SystemTime {
+impl DefaultGrpcType for SystemTime {
     type C = types::Int;
 }
 
 #[cfg(feature = "chrono")]
-impl<Tz: chrono::TimeZone> DefaultCassandraType for chrono::DateTime<Tz> {
+impl<Tz: chrono::TimeZone> DefaultGrpcType for chrono::DateTime<Tz> {
     type C = types::Int;
 }
 
 #[cfg(feature = "chrono")]
-impl<Tz: chrono::TimeZone> DefaultCassandraType for chrono::Date<Tz> {
+impl<Tz: chrono::TimeZone> DefaultGrpcType for chrono::Date<Tz> {
     type C = types::Date;
 }
 
-impl<T> DefaultCassandraType for Option<T>
+impl<T> DefaultGrpcType for Option<T>
 where
-    T: DefaultCassandraType,
+    T: DefaultGrpcType,
 {
-    type C = <T as DefaultCassandraType>::C;
+    type C = <T as DefaultGrpcType>::C;
 }
 
-impl<T> DefaultCassandraType for Vec<T>
+impl<T> DefaultGrpcType for Vec<T>
 where
-    T: DefaultCassandraType,
+    T: DefaultGrpcType,
 {
-    type C = types::List<<T as DefaultCassandraType>::C>;
+    type C = types::List<<T as DefaultGrpcType>::C>;
 }
 
-impl<K, V> DefaultCassandraType for Vec<KeyValue<K, V>>
+impl<K, V> DefaultGrpcType for Vec<KeyValue<K, V>>
 where
-    K: DefaultCassandraType,
-    V: DefaultCassandraType,
+    K: DefaultGrpcType,
+    V: DefaultGrpcType,
 {
-    type C = types::Map<<K as DefaultCassandraType>::C, <V as DefaultCassandraType>::C>;
+    type C = types::Map<<K as DefaultGrpcType>::C, <V as DefaultGrpcType>::C>;
 }
 
-impl<K, V> DefaultCassandraType for HashMap<K, V>
+impl<K, V> DefaultGrpcType for HashMap<K, V>
 where
-    K: DefaultCassandraType,
-    V: DefaultCassandraType,
+    K: DefaultGrpcType,
+    V: DefaultGrpcType,
 {
-    type C = types::Map<<K as DefaultCassandraType>::C, <V as DefaultCassandraType>::C>;
+    type C = types::Map<<K as DefaultGrpcType>::C, <V as DefaultGrpcType>::C>;
 }
 
-impl<K, V> DefaultCassandraType for BTreeMap<K, V>
+impl<K, V> DefaultGrpcType for BTreeMap<K, V>
 where
-    K: DefaultCassandraType,
-    V: DefaultCassandraType,
+    K: DefaultGrpcType,
+    V: DefaultGrpcType,
 {
-    type C = types::Map<<K as DefaultCassandraType>::C, <V as DefaultCassandraType>::C>;
+    type C = types::Map<<K as DefaultGrpcType>::C, <V as DefaultGrpcType>::C>;
 }
 
 /// Converts a value of Rust type into a Value of given Cassandra type.
@@ -769,10 +803,10 @@ impl Value {
 
 impl<R> From<R> for Value
 where
-    R: DefaultCassandraType + IntoValue<<R as into_value::DefaultCassandraType>::C>,
+    R: DefaultGrpcType + IntoValue<<R as into_value::DefaultGrpcType>::C>,
 {
     fn from(value: R) -> Self {
-        Value::convert::<R, <R as DefaultCassandraType>::C>(value)
+        Value::convert::<R, <R as DefaultGrpcType>::C>(value)
     }
 }
 
@@ -878,10 +912,10 @@ macro_rules! gen_tuple_conversion {
             }
         }
 
-        impl<$($R),+> DefaultCassandraType for ($($R),+)
-        where $($R: DefaultCassandraType),+
+        impl<$($R),+> DefaultGrpcType for ($($R),+)
+        where $($R: DefaultGrpcType),+
         {
-            type C = ($(<$R as DefaultCassandraType>::C),+);
+            type C = ($(<$R as DefaultGrpcType>::C),+);
         }
 
 

@@ -84,6 +84,29 @@
 //! # Ok::<(), ConversionError>(())
 //! ```
 //!
+//! ## Custom conversions
+//! You can make `Value` convertible to any type by implementing the [`TryFromValue`] trait.
+//!
+//! For example, let's define such conversion into a custom `Login` struct that wraps a `String`:
+//! ```
+//! use stargate_grpc::error::ConversionError;
+//! use stargate_grpc::from_value::TryFromValue;
+//! use stargate_grpc::Value;
+//!
+//! #[derive(Debug, PartialEq, Eq)]
+//! struct Login(String);
+//!
+//! impl TryFromValue for Login {
+//!     fn try_from(value: Value) -> Result<Self, ConversionError> {
+//!         Ok(Login(String::try_from(value)?))
+//!     }
+//! }
+//!
+//! let login: Login = Value::string("login").try_into()?;
+//! assert_eq!(login, Login("login".to_string()));
+//! # Ok::<(), ConversionError>(())
+//! ```
+
 
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
