@@ -5,15 +5,12 @@ use crate::proto::{
     Batch, BatchParameters, BatchQuery, Consistency, Payload, Query, QueryParameters, Value, Values,
 };
 
-/// A wrapper struct allowing us to convert tuples to query values.
-/// It is not possible to define a direct conversion from a tuple to a vector
-/// because both tuples and vectors are foreign to our crate and trait implementation
-/// rules forbid that.
-pub struct QueryValues(pub Vec<Value>);
-
-impl From<Vec<Value>> for QueryValues {
+impl From<Vec<Value>> for Values {
     fn from(v: Vec<Value>) -> Self {
-        QueryValues(v)
+        Values {
+            value_names: vec![],
+            values: v,
+        }
     }
 }
 
@@ -95,7 +92,7 @@ impl QueryBuilder {
     ///
     /// # Panics
     /// Will panic if it is called after a call to [`bind_name`](QueryBuilder::bind_name)
-    pub fn bind<I: Into<QueryValues>>(mut self, values: I) -> Self {
+    pub fn bind<I: Into<Values>>(mut self, values: I) -> Self {
         self.payload.bind(values);
         self
     }
@@ -276,7 +273,7 @@ impl BatchBuilder {
     ///
     /// # Panics
     /// Will panic if it is called after a call to [`bind_name`](BatchBuilder::bind_name)
-    pub fn bind<I: Into<QueryValues>>(mut self, values: I) -> Self {
+    pub fn bind<I: Into<Values>>(mut self, values: I) -> Self {
         self.payload.bind(values);
         self
     }
@@ -385,11 +382,13 @@ struct PayloadBuilder {
 }
 
 impl PayloadBuilder {
-    pub fn bind<I: Into<QueryValues>>(&mut self, values: I) {
+    pub fn bind<I: Into<Values>>(&mut self, values: I) {
         if !self.value_names.is_empty() {
             panic!("Mixing named with non-named values is not allowed")
         }
-        self.values.extend(values.into().0);
+        let values = values.into();
+        self.values.extend(values.values);
+        self.value_names.extend(values.value_names)
     }
 
     pub fn bind_ith<T: Into<Value>>(&mut self, index: usize, value: T) {
