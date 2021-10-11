@@ -15,7 +15,7 @@ pub struct ConversionError {
     pub target_type_name: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ConversionErrorKind {
     /// When the converter didn't know how to convert one type to another
     /// because the conversion hasn't been defined.

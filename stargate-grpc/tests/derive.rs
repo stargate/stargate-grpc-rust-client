@@ -1,4 +1,5 @@
 use stargate_grpc::*;
+use stargate_grpc::error::{ConversionError, ConversionErrorKind};
 
 #[test]
 fn convert_struct_to_udt_value() {
@@ -24,6 +25,25 @@ fn convert_struct_to_udt_value() {
 }
 
 #[test]
+fn convert_struct_to_udt_value_with_typed_fields() {
+    #[derive(IntoValue)]
+    struct Date {
+        #[stargate(grpc_type = "types::Date")]
+        days: u32,
+    }
+    let days = Date { days: 34835 };
+    let value = Value::from(days);
+    match value.inner {
+        Some(stargate_grpc::proto::value::Inner::Udt(value)) => {
+            assert_eq!(value.fields.get("days"), Some(&Value::date(34835)));
+        }
+        inner => {
+            assert!(false, "Unexpected udt inner value {:?}", inner)
+        }
+    }
+}
+
+#[test]
 fn convert_udt_value_to_struct() {
     #[derive(TryFromValue)]
     struct Address {
@@ -41,21 +61,42 @@ fn convert_udt_value_to_struct() {
 
 #[test]
 fn convert_udt_value_to_struct_with_default() {
-    fn default_permissions() -> i64 {
-        0o660
+    fn default_path() -> String {
+        "file.cfg".to_string()
     }
 
     #[derive(TryFromValue)]
-    struct File {
+    struct ConfigFile {
+        #[stargate(default = "default_path")]
         path: String,
         #[stargate(default)]
-        symlink: bool,
-        #[stargate(default = "default_permissions")]
-        permissions: i64,
+        open_on_startup: bool,
+        #[stargate(default)]
+        write_lock: bool,
     }
-    let udt_value = Value::udt(vec![("path", Value::string("file"))]);
-    let file: File = udt_value.try_into().unwrap();
-    assert_eq!(file.path, "file".to_string());
-    assert_eq!(file.symlink, false);
-    assert_eq!(file.permissions, 0o660);
+    let udt_value = Value::udt(vec![
+        ("path", Value::null()),
+        ("write_lock", Value::boolean(true)),
+    ]);
+    let file: ConfigFile = udt_value.try_into().unwrap();
+    assert_eq!(file.path, default_path());
+    assert_eq!(file.open_on_startup, false);
+    assert_eq!(file.write_lock, true);
+}
+
+
+#[test]
+fn convert_udt_value_to_struct_missing_fields() {
+    #[derive(TryFromValue)]
+    #[allow(unused)]
+    struct Address {
+        street: String,
+        number: i64,
+    }
+    let udt_value = Value::udt(vec![
+        ("number", Value::int(123)),
+    ]);
+    let result: Result<Address, ConversionError> = udt_value.try_into();
+    assert!(result.is_err());
+    assert_eq!(result.err().unwrap().kind, ConversionErrorKind::FieldNotFound("street"))
 }
