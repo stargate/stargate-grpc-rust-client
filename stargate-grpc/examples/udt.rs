@@ -1,10 +1,10 @@
 //! Demonstrates how to store Rust structs as UDT values in Cassandra and how to get them back
 
-use std::convert::TryInto;
 use stargate_grpc::*;
+use std::convert::TryInto;
 
-use connect::*;
 use config::*;
+use connect::*;
 
 #[path = "connect.rs"]
 mod connect;
@@ -13,22 +13,26 @@ mod connect;
 struct Address {
     street: String,
     number: i64,
-    apartment: Option<i64>
+    apartment: Option<i64>,
 }
 
 async fn create_schema(client: &mut StargateClient, keyspace: &str) -> anyhow::Result<()> {
     let create_type = QueryBuilder::new()
         .keyspace(keyspace)
-        .query("CREATE TYPE IF NOT EXISTS address(\
+        .query(
+            "CREATE TYPE IF NOT EXISTS address(\
                     street VARCHAR, \
                     number BIGINT, \
-                    apartment BIGINT)")
+                    apartment BIGINT)",
+        )
         .build();
     let create_table = QueryBuilder::new()
         .keyspace(keyspace)
-        .query("CREATE TABLE IF NOT EXISTS users_with_addr(\
+        .query(
+            "CREATE TABLE IF NOT EXISTS users_with_addr(\
                     id BIGINT PRIMARY KEY, \
-                    addresses LIST<FROZEN<address>>)")
+                    addresses LIST<FROZEN<address>>)",
+        )
         .build();
 
     client.execute_query(create_type).await?;
@@ -41,10 +45,21 @@ async fn insert_data(client: &mut StargateClient, keyspace: &str) -> anyhow::Res
         .keyspace(keyspace)
         .query("INSERT INTO users_with_addr(id, addresses) VALUES (:id, :addr)")
         .bind_name("id", 1)
-        .bind_name("addr", vec![
-            Address { street: "Long St".to_string(), number: 7870, apartment: Some(13) },
-            Address { street: "Nice St".to_string(), number: 12, apartment: None },
-        ])
+        .bind_name(
+            "addr",
+            vec![
+                Address {
+                    street: "Long St".to_string(),
+                    number: 7870,
+                    apartment: Some(13),
+                },
+                Address {
+                    street: "Nice St".to_string(),
+                    number: 12,
+                    apartment: None,
+                },
+            ],
+        )
         .build();
 
     client.execute_query(insert).await?;
@@ -64,7 +79,6 @@ async fn print_all_users(client: &mut StargateClient, keyspace: &str) -> anyhow:
     }
     Ok(())
 }
-
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
