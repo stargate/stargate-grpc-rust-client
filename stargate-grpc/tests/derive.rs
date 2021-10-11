@@ -1,5 +1,5 @@
-use stargate_grpc::*;
 use stargate_grpc::error::{ConversionError, ConversionErrorKind};
+use stargate_grpc::*;
 
 #[test]
 fn convert_struct_to_udt_value() {
@@ -84,7 +84,6 @@ fn convert_udt_value_to_struct_with_default() {
     assert_eq!(file.write_lock, true);
 }
 
-
 #[test]
 fn convert_udt_value_to_struct_missing_fields() {
     #[derive(TryFromValue)]
@@ -93,10 +92,37 @@ fn convert_udt_value_to_struct_missing_fields() {
         street: String,
         number: i64,
     }
-    let udt_value = Value::udt(vec![
-        ("number", Value::int(123)),
-    ]);
+    let udt_value = Value::udt(vec![("number", Value::int(123))]);
     let result: Result<Address, ConversionError> = udt_value.try_into();
     assert!(result.is_err());
-    assert_eq!(result.err().unwrap().kind, ConversionErrorKind::FieldNotFound("street"))
+    assert_eq!(
+        result.err().unwrap().kind,
+        ConversionErrorKind::FieldNotFound("street")
+    )
+}
+
+#[test]
+fn bind_struct_in_query() {
+    #[derive(IntoValue)]
+    struct User {
+        id: i64,
+        login: &'static str,
+    }
+    let user = User {
+        id: 1,
+        login: "user",
+    };
+    let query = QueryBuilder::new()
+        .query("INSERT INTO users(id, login) VALUES (:id, :login)")
+        .bind(user)
+        .build();
+
+    use prost::Message;
+    let values: proto::Values =
+        proto::Values::decode(query.values.unwrap().data.unwrap().value.as_slice()).unwrap();
+    assert_eq!(
+        values.value_names,
+        vec!["id".to_string(), "login".to_string()]
+    );
+    assert_eq!(values.values, vec![Value::int(1), Value::string("user")]);
 }

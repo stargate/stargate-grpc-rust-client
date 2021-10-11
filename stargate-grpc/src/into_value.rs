@@ -902,11 +902,14 @@ macro_rules! gen_tuple_conversion {
             }
         }
 
-        impl <$($R),+> From<($($R),+)> for query::QueryValues
+        impl <$($R),+> From<($($R),+)> for proto::Values
         where $($R: IntoValue<types::Any>),+
         {
             fn from(tuple: ($($R),+)) -> Self {
-                query::QueryValues(vec![$(tuple.$index.into_value()),+])
+                proto::Values {
+                    values: vec![$(tuple.$index.into_value()),+],
+                    value_names: vec![]
+                }
             }
         }
 

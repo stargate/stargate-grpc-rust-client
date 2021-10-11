@@ -45,15 +45,15 @@ fn token_stream(s: &str) -> proc_macro2::TokenStream {
 }
 
 /// Emits code for reading the field value and converting it to proper `Value` object.
-fn convert_to_value(field: &UdtField) -> TokenStream2 {
+fn convert_to_value(struc: &syn::Ident, field: &UdtField) -> TokenStream2 {
     let field_ident = field.ident.as_ref().unwrap();
     match &field.grpc_type {
         Some(t) => {
             let grpc_type = token_stream(t.as_str());
-            quote! { Value::of_type(#grpc_type, self.#field_ident) }
+            quote! { Value::of_type(#grpc_type, #struc.#field_ident) }
         }
         None => {
-            quote! { Value::from(self.#field_ident) }
+            quote! { Value::from(#struc.#field_ident) }
         }
     }
 }
@@ -62,27 +62,40 @@ fn convert_to_value(field: &UdtField) -> TokenStream2 {
 pub fn derive_into_value(tokens: TokenStream) -> TokenStream {
     let parsed = syn::parse(tokens).unwrap();
     let udt: Udt = Udt::from_derive_input(&parsed).unwrap();
-    let ident = udt.ident;
+    let udt_type = udt.ident;
 
+    let struct_var = syn::Ident::new("udt", proc_macro2::Span::mixed_site());
     let fields = get_fields(&udt.data);
     let field_names = field_names(fields);
-    let field_values = fields.iter().map(convert_to_value);
+    let field_values: Vec<_> = fields
+        .iter()
+        .map(|f| convert_to_value(&struct_var, &f))
+        .collect();
 
     let result = quote! {
 
-        impl stargate_grpc::into_value::IntoValue<stargate_grpc::types::Udt> for #ident {
+        impl stargate_grpc::into_value::IntoValue<stargate_grpc::types::Udt> for #udt_type {
             fn into_value(self) -> stargate_grpc::Value {
                 use stargate_grpc::Value;
+                let #struct_var = self;
                 let mut fields = std::collections::HashMap::new();
                 #(fields.insert(#field_names.to_string(), #field_values));*;
                 Value::raw_udt(fields)
             }
         }
 
-        impl stargate_grpc::into_value::DefaultGrpcType for #ident {
+        impl stargate_grpc::into_value::DefaultGrpcType for #udt_type {
             type C = stargate_grpc::types::Udt;
         }
 
+        impl std::convert::From<#udt_type> for stargate_grpc::proto::Values {
+            fn from(#struct_var: #udt_type) -> Self {
+                stargate_grpc::proto::Values {
+                     value_names: vec![#(#field_names.to_string()),*],
+                     values: vec![#(#field_values),*]
+                }
+            }
+        }
     };
     result.into()
 }
