@@ -10,7 +10,6 @@ use stargate_grpc::*;
 #[path = "connect.rs"]
 mod connect;
 
-/// Creates the test keyspace and an empty `users` table.
 async fn create_schema(client: &mut StargateClient, keyspace: &str) -> anyhow::Result<()> {
     let create_table = QueryBuilder::new()
         .keyspace(keyspace)
