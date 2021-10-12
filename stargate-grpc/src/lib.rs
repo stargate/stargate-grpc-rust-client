@@ -210,6 +210,12 @@
 //! stargate-grpc = { version = "0.1", features = ["chrono"] }
 //! ```
 //!
+//! ### Mapping Rust structs to user defined types
+//! Feature [`stargate-grpc-derive`](stargate_grpc_derive) (enabled by default) allows to
+//! generate conversions between `Value`s and your Rust structs by adding
+//! the `#[derive(IntoValue, TryFromValue)]` attribute on top of a struct definition.
+//!
+//!
 
 pub use client::{AuthToken, StargateClient};
 pub use from_value::TryFromValue;
