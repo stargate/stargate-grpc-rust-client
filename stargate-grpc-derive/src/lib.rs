@@ -4,8 +4,7 @@
 //! This module defines a few derive macros that can generate the conversion code automatically
 //! for you.
 //!
-//! ## Converting a Rust struct to a Value
-//!
+//! ## Converting a Rust struct to a `Value`
 //! ```
 //! use stargate_grpc::{IntoValue, Value};
 //!
@@ -21,8 +20,7 @@
 //! assert_eq!(value, Value::udt(vec![("id", Value::int(1)), ("login", Value::string("user"))]))
 //! ```
 //!
-//! ## Converting a Value to a Rust struct
-//!
+//! ## Converting a `Value` to a Rust struct
 //! ```
 //! use stargate_grpc::{TryFromValue, Value};
 //!
@@ -37,6 +35,27 @@
 //!
 //! assert_eq!(user.id, 1);
 //! assert_eq!(user.login, "user".to_string());
+//! ```
+//!
+//! ## Using structs as arguments in queries
+//! It is possible to unpack struct fields in such a way that each field value
+//! gets bound to a named argument of a query. For that to work, the struct must implement
+//! [`std::convert::Into<Values>`] trait. You can derive such trait automatically:
+//!
+//! ```
+//! use stargate_grpc::{IntoValues, QueryBuilder};
+//!
+//! #[derive(IntoValues)]
+//! struct User {
+//!     id: i64,
+//!     login: &'static str
+//! }
+//!
+//! let user = User { id: 1, login: "user" };
+//! let query = QueryBuilder::new()
+//!     .query("INSERT INTO users(id, login) VALUES (:id, :login)")
+//!     .bind(user)  // bind user.id to :id and user.login to :login
+//!     .build();
 //! ```
 //!
 //! ## Options
@@ -87,9 +106,9 @@
 //! }
 //! ```
 //!
-//! ### `#[stargate(name = "column name")]`
-//! Sets the CQL field, column or query parameter name associated with the field.
-//! If not given it is assumed to be the same as struct field name.
+//! ### `#[stargate(name = "column")]`
+//! Sets the CQL field, column or query argument name associated with the field.
+//! If not given, it is assumed to be the same as struct field name.
 //!
 use proc_macro::TokenStream;
 
@@ -130,6 +149,7 @@ fn field_idents(fields: &[UdtField]) -> Vec<&syn::Ident> {
     fields.iter().map(|f| f.ident.as_ref().unwrap()).collect()
 }
 
+/// Lists the field names of the associated Udt, Row or Values.
 fn field_names(fields: &[UdtField]) -> Vec<String> {
     fields
         .iter()
@@ -145,18 +165,23 @@ fn token_stream(s: &str) -> proc_macro2::TokenStream {
     s.parse().unwrap()
 }
 
-/// Emits code for reading the field value and converting it to proper `Value` object.
-fn convert_to_value(struc: &syn::Ident, field: &UdtField) -> TokenStream2 {
+/// Emits code for reading the field value and converting it to a `Value`.
+fn convert_to_value(obj: &syn::Ident, field: &UdtField) -> TokenStream2 {
     let field_ident = field.ident.as_ref().unwrap();
     match &field.grpc_type {
         Some(t) => {
             let grpc_type = token_stream(t.as_str());
-            quote! { stargate_grpc::Value::of_type(#grpc_type, #struc.#field_ident) }
+            quote! { stargate_grpc::Value::of_type(#grpc_type, #obj.#field_ident) }
         }
         None => {
-            quote! { stargate_grpc::Value::from(#struc.#field_ident) }
+            quote! { stargate_grpc::Value::from(#obj.#field_ident) }
         }
     }
+}
+
+/// For each field, returns an expression that converts that field's value to a `Value`.
+fn convert_to_values(obj: &syn::Ident, fields: &[UdtField]) -> Vec<TokenStream2> {
+    fields.iter().map(|f| convert_to_value(obj, f)).collect()
 }
 
 /// Derives the `IntoValue` and `DefaultGrpcType` implementations for a struct.
@@ -166,36 +191,50 @@ pub fn derive_into_value(tokens: TokenStream) -> TokenStream {
     let udt: Udt = Udt::from_derive_input(&parsed).unwrap();
     let udt_type = udt.ident;
 
-    let struct_var = syn::Ident::new("udt", proc_macro2::Span::mixed_site());
+    let obj = syn::Ident::new("obj", proc_macro2::Span::mixed_site());
     let fields: Vec<_> = get_fields(udt.data)
         .into_iter()
         .filter(|f| !f.skip)
         .collect();
     let remote_field_names = field_names(&fields);
-    let field_values: Vec<_> = fields
-        .iter()
-        .map(|f| convert_to_value(&struct_var, f))
-        .collect();
+    let field_values: Vec<_> = convert_to_values(&obj, &fields);
 
     let result = quote! {
-
         impl stargate_grpc::into_value::IntoValue<stargate_grpc::types::Udt> for #udt_type {
             fn into_value(self) -> stargate_grpc::Value {
-                let #struct_var = self;
+                let #obj = self;
                 let mut fields = std::collections::HashMap::new();
                 #(fields.insert(#remote_field_names.to_string(), #field_values));*;
                 stargate_grpc::Value::raw_udt(fields)
             }
         }
-
         impl stargate_grpc::into_value::DefaultGrpcType for #udt_type {
             type C = stargate_grpc::types::Udt;
         }
+    };
+    result.into()
+}
 
+/// Derives the `IntoValues` impl that allows to use struct in `QueryBuilder::bind`
+#[proc_macro_derive(IntoValues, attributes(stargate))]
+pub fn derive_into_values(tokens: TokenStream) -> TokenStream {
+    let parsed = syn::parse(tokens).unwrap();
+    let udt: Udt = Udt::from_derive_input(&parsed).unwrap();
+    let udt_type = udt.ident;
+
+    let obj = syn::Ident::new("obj", proc_macro2::Span::mixed_site());
+    let fields: Vec<_> = get_fields(udt.data)
+        .into_iter()
+        .filter(|f| !f.skip)
+        .collect();
+    let field_names = field_names(&fields);
+    let field_values: Vec<_> = convert_to_values(&obj, &fields);
+
+    let result = quote! {
         impl std::convert::From<#udt_type> for stargate_grpc::proto::Values {
-            fn from(#struct_var: #udt_type) -> Self {
+            fn from(#obj: #udt_type) -> Self {
                 stargate_grpc::proto::Values {
-                     value_names: vec![#(#remote_field_names.to_string()),*],
+                     value_names: vec![#(#field_names.to_string()),*],
                      values: vec![#(#field_values),*]
                 }
             }
