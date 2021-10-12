@@ -14,6 +14,8 @@ struct UdtField {
     default: Option<Override<String>>,
     #[darling(default)]
     grpc_type: Option<String>,
+    #[darling(default)]
+    skip: bool,
 }
 
 #[derive(Debug, FromDeriveInput)]
@@ -22,9 +24,9 @@ struct Udt {
     data: ast::Data<util::Ignored, UdtField>,
 }
 
-fn get_fields(udt: &ast::Data<util::Ignored, UdtField>) -> &Vec<UdtField> {
+fn get_fields(udt: ast::Data<util::Ignored, UdtField>) -> Vec<UdtField> {
     match udt {
-        ast::Data::Struct(s) => &s.fields,
+        ast::Data::Struct(s) => s.fields,
         _ => panic!("Deriving IntoValue allowed only on structs"),
     }
 }
@@ -65,11 +67,14 @@ pub fn derive_into_value(tokens: TokenStream) -> TokenStream {
     let udt_type = udt.ident;
 
     let struct_var = syn::Ident::new("udt", proc_macro2::Span::mixed_site());
-    let fields = get_fields(&udt.data);
-    let field_names = field_names(fields);
+    let fields: Vec<_> = get_fields(udt.data)
+        .into_iter()
+        .filter(|f| !f.skip)
+        .collect();
+    let field_names = field_names(&fields);
     let field_values: Vec<_> = fields
         .iter()
-        .map(|f| convert_to_value(&struct_var, &f))
+        .map(|f| convert_to_value(&struct_var, f))
         .collect();
 
     let result = quote! {
@@ -135,8 +140,8 @@ pub fn derive_try_from_value(tokens: TokenStream) -> TokenStream {
     let parsed = syn::parse(tokens).unwrap();
     let udt: Udt = Udt::from_derive_input(&parsed).unwrap();
     let ident = udt.ident;
-    let fields = get_fields(&udt.data);
-    let field_idents = field_idents(fields);
+    let fields = get_fields(udt.data);
+    let field_idents = field_idents(&fields);
     let udt_hashmap = syn::Ident::new("fields", proc_macro2::Span::mixed_site());
     let field_values = fields
         .iter()

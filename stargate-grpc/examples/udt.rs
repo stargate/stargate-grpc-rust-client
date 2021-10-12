@@ -13,6 +13,7 @@ mod connect;
 struct Address {
     street: String,
     number: i64,
+    #[stargate(default)]
     apartment: Option<i64>,
 }
 
