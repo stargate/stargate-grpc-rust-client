@@ -158,7 +158,7 @@ fn convert_udt_value_to_struct_missing_fields() {
 
 #[test]
 fn bind_struct_in_query() {
-    #[derive(IntoValue)]
+    #[derive(IntoValues)]
     struct User {
         id: i64,
         login: &'static str,
