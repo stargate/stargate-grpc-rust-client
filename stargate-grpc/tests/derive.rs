@@ -44,6 +44,31 @@ fn convert_struct_to_udt_value_with_typed_fields() {
 }
 
 #[test]
+fn convert_struct_to_value_skip_fields() {
+    #[derive(IntoValue)]
+    struct Address {
+        street: &'static str,
+        #[stargate(skip)] // exclude this field from writing into `UdtValue`
+        #[allow(unused)]
+        number: i64,
+    }
+    let addr = Address {
+        street: "foo",
+        number: 123,
+    };
+    let value = Value::from(addr);
+    match value.inner {
+        Some(stargate_grpc::proto::value::Inner::Udt(value)) => {
+            assert_eq!(value.fields.get("street"), Some(&Value::string("foo")));
+            assert_eq!(value.fields.get("number"), None);
+        }
+        inner => {
+            assert!(false, "Unexpected udt inner value {:?}", inner)
+        }
+    }
+}
+
+#[test]
 fn convert_udt_value_to_struct() {
     #[derive(TryFromValue)]
     struct Address {

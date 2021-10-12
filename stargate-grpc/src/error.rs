@@ -75,10 +75,19 @@ impl ConversionError {
 
 impl Display for ConversionError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let reason = match &self.kind {
+            ConversionErrorKind::Incompatible => "incompatible types".to_string(),
+            ConversionErrorKind::GrpcDecodeError(e) => format!("gRPC decode error {}", e),
+            ConversionErrorKind::OutOfRange => "value out of range".to_string(),
+            ConversionErrorKind::FieldNotFound(field) => format!("field \"{}\" not found", field),
+            ConversionErrorKind::WrongNumberOfItems { actual, expected } => {
+                format!("expected {} but got {} items", expected, actual)
+            }
+        };
         write!(
             f,
-            "Cannot convert value {} to {}",
-            self.source, self.target_type_name
+            "Cannot convert value {} to {}: {}",
+            self.source, self.target_type_name, reason
         )
     }
 }
