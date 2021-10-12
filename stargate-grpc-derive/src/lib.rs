@@ -1,3 +1,96 @@
+//! # Derive macros for mapping between `Value` and Rust structs
+//!
+//! Converting structures from/to hash maps manually is tedious.
+//! This module defines a few derive macros that can generate the conversion code automatically
+//! for you.
+//!
+//! ## Converting a Rust struct to a Value
+//!
+//! ```
+//! use stargate_grpc::{IntoValue, Value};
+//!
+//! #[derive(IntoValue)]
+//! struct User {
+//!     id: i64,
+//!     login: &'static str
+//! }
+//!
+//! let user = User { id: 1, login: "user" };
+//! let value = Value::from(user);
+//!
+//! assert_eq!(value, Value::udt(vec![("id", Value::int(1)), ("login", Value::string("user"))]))
+//! ```
+//!
+//! ## Converting a Value to a Rust struct
+//!
+//! ```
+//! use stargate_grpc::{TryFromValue, Value};
+//!
+//! #[derive(TryFromValue)]
+//! struct User {
+//!     id: i64,
+//!     login: String
+//! }
+//!
+//! let value = Value::udt(vec![("id", Value::int(1)), ("login", Value::string("user"))]);
+//! let user: User = value.try_into().unwrap();
+//!
+//! assert_eq!(user.id, 1);
+//! assert_eq!(user.login, "user".to_string());
+//! ```
+//!
+//! ## Options
+//! All macros defined in this module accept a `#[stargate]` attribute that you can set
+//! on struct fields to control the details of how the conversion should be made.
+//!
+//! ### `#[stargate(skip)]`
+//! Skips the field when doing the conversion to `Value`. This is useful when the structure
+//! needs to store some data that are not mapped to the database schema.
+//! However, the field is included in the conversion from `Value`, and the conversion would fail
+//! if it was missing, hence you likely need to set `#[stargate(default)]` as well.
+//!
+//! ### `#[stargate(default)]`
+//! Uses the default value for the field type provided by [`std::default::Default`],
+//! if the source `Value` doesn't contain the field, or if the field is set to `Value::null`
+//! or `Value::unset`.
+//!
+//! ### `#[stargate(default = "expression")]`
+//! Obtains the default value by evaluating given Rust expression given as a string.
+//!
+//! ```
+//! use stargate_grpc::TryFromValue;
+//!
+//! fn default_file_name() -> String {
+//!     "file.txt".to_string()
+//! }
+//!
+//! #[derive(TryFromValue)]
+//! struct File {
+//!     #[stargate(default = "default_file_name()")]
+//!     path: String,
+//! }
+//! ```
+//!
+//! ### `#[stargate(grpc_type = "type")]`
+//! Sets the target gRPC type the field should be converted into, useful
+//! when there are multiple possibilities.
+//!
+//! ```
+//! use stargate_grpc::{types, IntoValue};
+//!
+//! #[derive(IntoValue)]
+//! struct InetAndUuid {
+//!     #[stargate(grpc_type = "types::Inet")]
+//!     inet: [u8; 16],
+//!     #[stargate(grpc_type = "types::Uuid")]
+//!     uuid: [u8; 16],
+//! }
+//! ```
+//!
+//! ### `#[stargate(name = "column name")]`
+//! Sets the CQL field, column or query parameter name associated with the field.
+//! If not given it is assumed to be the same as struct field name.
+//!
 use proc_macro::TokenStream;
 
 use darling::util::Override;
@@ -16,6 +109,8 @@ struct UdtField {
     grpc_type: Option<String>,
     #[darling(default)]
     skip: bool,
+    #[darling(default)]
+    name: Option<String>,
 }
 
 #[derive(Debug, FromDeriveInput)]
@@ -38,7 +133,11 @@ fn field_idents(fields: &[UdtField]) -> Vec<&syn::Ident> {
 fn field_names(fields: &[UdtField]) -> Vec<String> {
     fields
         .iter()
-        .map(|f| f.ident.as_ref().unwrap().to_string())
+        .map(|f| {
+            f.name
+                .clone()
+                .unwrap_or_else(|| f.ident.as_ref().unwrap().to_string())
+        })
         .collect()
 }
 
@@ -52,14 +151,15 @@ fn convert_to_value(struc: &syn::Ident, field: &UdtField) -> TokenStream2 {
     match &field.grpc_type {
         Some(t) => {
             let grpc_type = token_stream(t.as_str());
-            quote! { Value::of_type(#grpc_type, #struc.#field_ident) }
+            quote! { stargate_grpc::Value::of_type(#grpc_type, #struc.#field_ident) }
         }
         None => {
-            quote! { Value::from(#struc.#field_ident) }
+            quote! { stargate_grpc::Value::from(#struc.#field_ident) }
         }
     }
 }
 
+/// Derives the `IntoValue` and `DefaultGrpcType` implementations for a struct.
 #[proc_macro_derive(IntoValue, attributes(stargate))]
 pub fn derive_into_value(tokens: TokenStream) -> TokenStream {
     let parsed = syn::parse(tokens).unwrap();
@@ -71,7 +171,7 @@ pub fn derive_into_value(tokens: TokenStream) -> TokenStream {
         .into_iter()
         .filter(|f| !f.skip)
         .collect();
-    let field_names = field_names(&fields);
+    let remote_field_names = field_names(&fields);
     let field_values: Vec<_> = fields
         .iter()
         .map(|f| convert_to_value(&struct_var, f))
@@ -81,11 +181,10 @@ pub fn derive_into_value(tokens: TokenStream) -> TokenStream {
 
         impl stargate_grpc::into_value::IntoValue<stargate_grpc::types::Udt> for #udt_type {
             fn into_value(self) -> stargate_grpc::Value {
-                use stargate_grpc::Value;
                 let #struct_var = self;
                 let mut fields = std::collections::HashMap::new();
-                #(fields.insert(#field_names.to_string(), #field_values));*;
-                Value::raw_udt(fields)
+                #(fields.insert(#remote_field_names.to_string(), #field_values));*;
+                stargate_grpc::Value::raw_udt(fields)
             }
         }
 
@@ -96,7 +195,7 @@ pub fn derive_into_value(tokens: TokenStream) -> TokenStream {
         impl std::convert::From<#udt_type> for stargate_grpc::proto::Values {
             fn from(#struct_var: #udt_type) -> Self {
                 stargate_grpc::proto::Values {
-                     value_names: vec![#(#field_names.to_string()),*],
+                     value_names: vec![#(#remote_field_names.to_string()),*],
                      values: vec![#(#field_values),*]
                 }
             }
@@ -109,7 +208,10 @@ pub fn derive_into_value(tokens: TokenStream) -> TokenStream {
 /// Applies default value if the key is missing in the hashmap or if the value
 /// under the key is null.
 fn convert_from_hashmap_value(hashmap: &syn::Ident, field: &UdtField) -> TokenStream2 {
-    let field_name = field.ident.as_ref().unwrap().to_string();
+    let field_name = field
+        .name
+        .clone()
+        .unwrap_or_else(|| field.ident.as_ref().unwrap().to_string());
     let field_type = &field.ty;
 
     let default_expr = match &field.default {
@@ -117,7 +219,7 @@ fn convert_from_hashmap_value(hashmap: &syn::Ident, field: &UdtField) -> TokenSt
         Some(Override::Inherit) => quote! { Ok(std::default::Default::default()) },
         Some(Override::Explicit(s)) => {
             let path = token_stream(s);
-            quote! { Ok(#path()) }
+            quote! { Ok(#path) }
         }
     };
 
@@ -135,6 +237,7 @@ fn convert_from_hashmap_value(hashmap: &syn::Ident, field: &UdtField) -> TokenSt
     }
 }
 
+/// Derives the `TryFromValue` implementation for a struct.
 #[proc_macro_derive(TryFromValue, attributes(stargate))]
 pub fn derive_try_from_value(tokens: TokenStream) -> TokenStream {
     let parsed = syn::parse(tokens).unwrap();

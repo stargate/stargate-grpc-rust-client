@@ -1,3 +1,5 @@
+//! Integration tests for stargate-grpc-derive
+
 use stargate_grpc::error::{ConversionError, ConversionErrorKind};
 use stargate_grpc::*;
 
@@ -69,6 +71,34 @@ fn convert_struct_to_value_skip_fields() {
 }
 
 #[test]
+fn rename_fields() {
+    #[derive(Eq, PartialEq, IntoValue, TryFromValue)]
+    struct Address {
+        #[stargate(name = "st")]
+        street: String,
+        number: i64,
+    }
+    let addr = Address {
+        street: "foo".to_string(),
+        number: 123,
+    };
+    let value = Value::from(addr);
+    match &value.inner {
+        Some(stargate_grpc::proto::value::Inner::Udt(value)) => {
+            assert_eq!(value.fields.get("st"), Some(&Value::string("foo")));
+            assert_eq!(value.fields.get("number"), Some(&Value::int(123)));
+        }
+        inner => {
+            assert!(false, "Unexpected udt inner value {:?}", inner)
+        }
+    }
+    // convert back
+    let addr: Address = value.try_into().unwrap();
+    assert_eq!(addr.street, "foo".to_string());
+    assert_eq!(addr.number, 123);
+}
+
+#[test]
 fn convert_udt_value_to_struct() {
     #[derive(TryFromValue)]
     struct Address {
@@ -92,7 +122,7 @@ fn convert_udt_value_to_struct_with_default() {
 
     #[derive(TryFromValue)]
     struct ConfigFile {
-        #[stargate(default = "default_path")]
+        #[stargate(default = "default_path()")]
         path: String,
         #[stargate(default)]
         open_on_startup: bool,

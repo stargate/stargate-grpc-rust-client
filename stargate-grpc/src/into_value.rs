@@ -860,8 +860,11 @@ gen_conversion!(&str => types::String; x => Value::raw_string(x.to_string()));
 gen_conversion!(Vec<u8> => types::Bytes; x => Value::raw_bytes(x));
 gen_conversion!(Vec<u8> => types::Varint; x => Value::raw_varint(x));
 
+gen_conversion!([u8; 4] => types::Inet; x => Value::raw_inet(x.to_vec()));
 gen_conversion!(&[u8; 4] => types::Inet; x => Value::raw_inet(x.to_vec()));
+gen_conversion!([u8; 16] => types::Inet; x => Value::raw_inet(x.to_vec()));
 gen_conversion!(&[u8; 16] => types::Inet; x => Value::raw_inet(x.to_vec()));
+gen_conversion!([u8; 16] => types::Uuid; x => Value::raw_uuid(&x));
 gen_conversion!(&[u8; 16] => types::Uuid; x => Value::raw_uuid(x));
 
 gen_conversion!(proto::Decimal => types::Decimal; x => Value::raw_decimal(x.scale, x.value));
