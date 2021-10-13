@@ -27,7 +27,7 @@ Add required dependencies. You'll need at least `stargate-grpc` and an async fra
 e.g. tokio:
 
 ```toml
-[devependencies]
+[dependencies]
 stargate-grpc = { git = "https://github.com/stargate/stargate-grpc-rust-client" }
 tokio = { version = "1", features = ["full"]}
 ```
