@@ -146,8 +146,8 @@ impl StargateClientBuilder {
     /// # Panics
     /// Panics if some mandatory settings hasn't been set.
     pub async fn connect(self) -> Result<StargateClient, tonic::transport::Error> {
-        let token = self.token.expect("Authentication token");
-        let mut endpoint = self.endpoint.expect("Endpoint");
+        let token = self.token.expect("Stargate authentication token not set");
+        let mut endpoint = self.endpoint.expect("Stargate URI not set");
         if let Some(tls) = self.tls_config {
             endpoint = endpoint.tls_config(tls)?
         }
