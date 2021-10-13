@@ -70,7 +70,7 @@ let query = Query::builder()
     .keyspace("test")                           // set the keyspace the query applies to
     .consistency(Consistency::LocalQuorum)      // set consistency level
     .query("SELECT login, emails FROM users WHERE id = :id")
-    .named_value("id", 1000)                    // bind :id to 1000
+    .bind_name("id", 1000)                      // bind :id to 1000
     .build();                                   // build the Query
 ```
 
