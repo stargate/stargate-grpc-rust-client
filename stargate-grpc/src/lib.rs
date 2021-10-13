@@ -130,7 +130,7 @@
 //! # }
 //! ```
 //!
-//! Finally, you can convert a whole `Row` into a struct with a mapper obtained
+//! Alternativelly, you can convert a whole `Row` into a struct with a mapper obtained
 //! from [`ResultSet::mapper`](ResultSet::mapper):
 //!
 //! ```
