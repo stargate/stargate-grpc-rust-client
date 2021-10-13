@@ -321,3 +321,49 @@ pub fn derive_try_from_value(tokens: TokenStream) -> TokenStream {
 
     result.into()
 }
+
+/// Derives the `TryFromRow` implementation for a struct.
+#[proc_macro_derive(TryFromRow, attributes(stargate))]
+pub fn derive_try_from_typed_row(tokens: TokenStream) -> TokenStream {
+    let parsed = syn::parse(tokens).unwrap();
+    let udt: Udt = Udt::from_derive_input(&parsed).unwrap();
+    let ident = udt.ident;
+    let fields = get_fields(udt.data);
+    let field_idents = field_idents(&fields);
+    let field_names = field_names(&fields);
+    let indexes = 0..field_idents.len();
+
+    let result = quote! {
+        impl stargate_grpc::result::ColumnPositions for #ident {
+            fn field_to_column_pos(
+                column_positions: std::collections::HashMap<String, usize>
+            ) -> Result<Vec<usize>, stargate_grpc::result::MapperError>
+            {
+                use stargate_grpc::result::MapperError;
+                let mut result = Vec::new();
+                #(
+                    result.push(
+                        *column_positions
+                            .get(#field_names)
+                            .ok_or_else(|| MapperError::ColumnNotFound(#field_names))?
+                    );
+                )*
+                Ok(result)
+            }
+        }
+
+        impl stargate_grpc::result::TryFromRow for #ident {
+            fn try_unpack(
+                mut row: stargate_grpc::Row,
+                column_positions: &Vec<usize>
+            ) -> Result<Self, stargate_grpc::error::ConversionError>
+            {
+                Ok(#ident {
+                    #(#field_idents: row.values[column_positions[#indexes]].take().try_into()?),*
+                })
+            }
+        }
+    };
+
+    result.into()
+}

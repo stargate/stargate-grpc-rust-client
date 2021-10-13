@@ -1,6 +1,9 @@
 //! Integration tests for stargate-grpc-derive
 
+use std::collections::HashMap;
+
 use stargate_grpc::error::{ConversionError, ConversionErrorKind};
+use stargate_grpc::proto::ColumnSpec;
 use stargate_grpc::*;
 
 #[test]
@@ -140,7 +143,27 @@ fn convert_udt_value_to_struct_with_default() {
 }
 
 #[test]
-fn convert_udt_value_to_struct_missing_fields() {
+fn convert_udt_value_to_struct_returns_err_on_field_conversion_err() {
+    #[derive(TryFromValue)]
+    #[allow(unused)]
+    struct Address {
+        street: String,
+        number: i64,
+    }
+    let udt_value = Value::udt(vec![
+        ("street", Value::string("foo")),
+        ("number", Value::string("wrong field type")),
+    ]);
+    let result: Result<Address, ConversionError> = udt_value.try_into();
+    assert!(result.is_err());
+    assert_eq!(
+        result.err().unwrap().kind,
+        ConversionErrorKind::Incompatible
+    )
+}
+
+#[test]
+fn convert_udt_value_to_struct_returns_err_missing_fields() {
     #[derive(TryFromValue)]
     #[allow(unused)]
     struct Address {
@@ -180,4 +203,111 @@ fn bind_struct_in_query() {
         vec!["id".to_string(), "login".to_string()]
     );
     assert_eq!(values.values, vec![Value::int(1), Value::string("user")]);
+}
+
+#[test]
+fn get_column_positions() {
+    #[derive(TryFromRow)]
+    #[allow(unused)]
+    struct User {
+        id: i64,
+        login: String,
+    }
+    use stargate_grpc::result::ColumnPositions;
+    let mut positions = HashMap::new();
+    positions.insert("id".to_string(), 6);
+    positions.insert("login".to_string(), 2);
+    let positions = User::field_to_column_pos(positions).unwrap();
+    assert_eq!(positions, vec![6, 2])
+}
+
+#[test]
+fn get_column_positions_missing_column() {
+    #[derive(TryFromRow)]
+    #[allow(unused)]
+    struct User {
+        id: i64,
+        login: String,
+    }
+    use stargate_grpc::result::ColumnPositions;
+    let mut positions = HashMap::new();
+    positions.insert("id".to_string(), 6);
+    let positions = User::field_to_column_pos(positions);
+    assert!(positions.is_err())
+}
+
+fn column(name: &str) -> ColumnSpec {
+    ColumnSpec {
+        r#type: None,
+        name: name.to_string(),
+    }
+}
+
+#[test]
+fn convert_row_to_struct() {
+    #[derive(TryFromRow)]
+    struct User {
+        id: i64,
+        login: String,
+    }
+    let result_set = ResultSet {
+        columns: vec![column("id"), column("login")],
+        rows: vec![Row {
+            values: vec![Value::int(1), Value::string("user_1")],
+        }],
+        paging_state: None,
+    };
+
+    let mapper = result_set.mapper().unwrap();
+    for row in result_set.rows {
+        let user: User = mapper.try_unpack(row).unwrap();
+        assert_eq!(user.id, 1);
+        assert_eq!(user.login, "user_1");
+    }
+}
+
+#[test]
+fn convert_row_to_struct_returns_err_on_missing_column() {
+    #[derive(TryFromRow)]
+    #[allow(unused)]
+    struct User {
+        id: i64,
+        login: String,
+    }
+    let result_set = ResultSet {
+        columns: vec![column("id"), column("login")],
+        rows: vec![Row {
+            values: vec![Value::int(1)],
+        }],
+        paging_state: None,
+    };
+
+    let mapper = result_set.mapper().unwrap();
+    for row in result_set.rows {
+        let user: Result<User, ConversionError> = mapper.try_unpack(row);
+        assert!(user.is_err());
+    }
+}
+
+#[test]
+fn convert_row_to_struct_returns_err_on_value_conversion_err() {
+    #[derive(TryFromRow)]
+    #[allow(unused)]
+    struct User {
+        id: i64,
+        login: String,
+    }
+    let result_set = ResultSet {
+        columns: vec![column("id"), column("login")],
+        rows: vec![Row {
+            values: vec![Value::string("wrong type"), Value::string("user_1")],
+        }],
+        paging_state: None,
+    };
+
+    let mapper = result_set.mapper().unwrap();
+    for row in result_set.rows {
+        let user: Result<User, ConversionError> = mapper.try_unpack(row);
+        assert!(user.is_err());
+    }
 }

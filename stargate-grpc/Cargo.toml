@@ -10,6 +10,7 @@ itertools = "0.10"
 prost = "0.8"
 prost-types = "0.8"
 rustls-native-certs = "0.5.0"
+streaming-iterator = "0.1.5"
 tokio-rustls = "0.22"
 tonic = { version = "0.5", features = ["transport", "tls"] }
 
