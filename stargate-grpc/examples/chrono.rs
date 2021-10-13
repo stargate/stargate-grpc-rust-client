@@ -13,7 +13,7 @@ mod connect;
 
 /// Creates the test keyspace and an empty `users` table.
 async fn create_schema(client: &mut StargateClient, keyspace: &str) -> anyhow::Result<()> {
-    let create_table = QueryBuilder::new()
+    let create_table = Query::builder()
         .keyspace(keyspace)
         .query(
             r"CREATE TABLE IF NOT EXISTS events (
@@ -31,7 +31,7 @@ async fn create_schema(client: &mut StargateClient, keyspace: &str) -> anyhow::R
 
 /// Inserts a row with a date and timestamp.
 async fn insert_event(client: &mut StargateClient, keyspace: &str) -> anyhow::Result<()> {
-    let query = QueryBuilder::new()
+    let query = Query::builder()
         .keyspace(keyspace)
         .query("INSERT INTO events(sensor, day, ts, value) VALUES (?, ?, ?, ?)");
 
@@ -46,7 +46,7 @@ async fn insert_event(client: &mut StargateClient, keyspace: &str) -> anyhow::Re
 /// Fetches some rows with dates and timestamps.
 async fn print_events(client: &mut StargateClient, keyspace: &str) -> anyhow::Result<()> {
     let day = Local::now().date();
-    let query = QueryBuilder::new()
+    let query = Query::builder()
         .keyspace(keyspace)
         .query("SELECT sensor, day, ts, value FROM events WHERE sensor = ? AND day = ?")
         .bind((0, day))

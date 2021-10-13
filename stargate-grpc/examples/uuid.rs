@@ -11,7 +11,7 @@ use stargate_grpc::*;
 mod connect;
 
 async fn create_schema(client: &mut StargateClient, keyspace: &str) -> anyhow::Result<()> {
-    let create_table = QueryBuilder::new()
+    let create_table = Query::builder()
         .keyspace(keyspace)
         .query("CREATE TABLE IF NOT EXISTS users_uuid (id uuid primary key, name varchar)")
         .build();
@@ -27,7 +27,7 @@ async fn register_user(
     name: &str,
 ) -> anyhow::Result<Uuid> {
     let uuid = Uuid::new_v4();
-    let query = QueryBuilder::new()
+    let query = Query::builder()
         .keyspace(keyspace)
         .query("INSERT INTO users_uuid (id, name) VALUES (:id, :name)")
         .bind_name("id", uuid)
@@ -43,7 +43,7 @@ async fn fetch_user(
     keyspace: &str,
     id: Uuid,
 ) -> anyhow::Result<Option<(Uuid, String)>> {
-    let query = QueryBuilder::new()
+    let query = Query::builder()
         .keyspace(keyspace)
         .query("SELECT id, name FROM users_uuid WHERE id = :id")
         .bind_name("id", id)

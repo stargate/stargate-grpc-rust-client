@@ -167,7 +167,7 @@ fn bind_struct_in_query() {
         id: 1,
         login: "user",
     };
-    let query = QueryBuilder::new()
+    let query = Query::builder()
         .query("INSERT INTO users(id, login) VALUES (:id, :login)")
         .bind(user)
         .build();

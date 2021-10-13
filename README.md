@@ -66,7 +66,7 @@ let mut client = StargateClient::builder()
 Use `QueryBuilder` to create a query, bind query values and pass query parameters:
 
 ```rust
-let query = QueryBuilder::new()
+let query = Query::builder()
     .keyspace("test")                           // set the keyspace the query applies to
     .consistency(Consistency::LocalQuorum)      // set consistency level
     .query("SELECT login, emails FROM users WHERE id = :id")

@@ -1,6 +1,6 @@
 use config::*;
 use connect::*;
-use stargate_grpc::{QueryBuilder, StargateClient};
+use stargate_grpc::{Query, StargateClient};
 
 #[path = "connect.rs"]
 mod connect;
@@ -12,7 +12,7 @@ pub async fn create_keyspace(client: &mut StargateClient, keyspace: &str) -> any
             WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': 1}}",
         keyspace
     );
-    let create_keyspace = QueryBuilder::new().query(cql.as_str()).build();
+    let create_keyspace = Query::builder().query(cql.as_str()).build();
     client.execute_query(create_keyspace).await?;
     Ok(())
 }

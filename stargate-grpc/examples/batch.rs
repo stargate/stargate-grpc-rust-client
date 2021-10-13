@@ -9,7 +9,7 @@ mod connect;
 
 /// Creates the test keyspace and an empty `users` and `users_by_login` tables
 async fn create_schema(client: &mut StargateClient, keyspace: &str) -> anyhow::Result<()> {
-    let builder = QueryBuilder::new().keyspace(keyspace);
+    let builder = Query::builder().keyspace(keyspace);
     let create_users_table = builder
         .clone()
         .query(
@@ -34,7 +34,7 @@ async fn register_user(
     id: i64,
     login: &str,
 ) -> anyhow::Result<i64> {
-    let batch = BatchBuilder::new()
+    let batch = Batch::builder()
         .keyspace(keyspace)
         .query("INSERT INTO users (id, login, emails) VALUES (:id, :login, :emails)")
         .bind_name("id", id)

@@ -43,7 +43,7 @@
 //! [`std::convert::Into<Values>`] trait. You can derive such trait automatically:
 //!
 //! ```
-//! use stargate_grpc::{IntoValues, QueryBuilder};
+//! use stargate_grpc::{IntoValues, Query};
 //!
 //! #[derive(IntoValues)]
 //! struct User {
@@ -52,7 +52,7 @@
 //! }
 //!
 //! let user = User { id: 1, login: "user" };
-//! let query = QueryBuilder::new()
+//! let query = Query::builder()
 //!     .query("INSERT INTO users(id, login) VALUES (:id, :login)")
 //!     .bind(user)  // bind user.id to :id and user.login to :login
 //!     .build();

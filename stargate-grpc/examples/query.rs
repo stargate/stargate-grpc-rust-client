@@ -11,7 +11,7 @@ mod connect;
 
 /// Creates an empty `users` table
 async fn create_schema(client: &mut StargateClient, keyspace: &str) -> anyhow::Result<()> {
-    let create_table = QueryBuilder::new()
+    let create_table = Query::builder()
         .keyspace(keyspace)
         .query(
             "CREATE TABLE IF NOT EXISTS users \
@@ -25,7 +25,7 @@ async fn create_schema(client: &mut StargateClient, keyspace: &str) -> anyhow::R
 
 /// Inserts some sample data into the `users` table
 async fn insert_data(client: &mut StargateClient, keyspace: &str) -> anyhow::Result<()> {
-    let insert = QueryBuilder::new()
+    let insert = Query::builder()
         .keyspace(keyspace)
         .query("INSERT INTO users(id, login, emails) VALUES (?, ?, ?)");
 
@@ -43,7 +43,7 @@ async fn insert_data(client: &mut StargateClient, keyspace: &str) -> anyhow::Res
 
 /// Fetches all rows from the `user` table.
 async fn select_all(client: &mut StargateClient, keyspace: &str) -> anyhow::Result<ResultSet> {
-    let query = QueryBuilder::new()
+    let query = Query::builder()
         .keyspace(keyspace)
         .query("SELECT id, login, emails FROM users")
         .build();
@@ -57,7 +57,7 @@ async fn select_one(
     keyspace: &str,
     id: i32,
 ) -> anyhow::Result<ResultSet> {
-    let query = QueryBuilder::new()
+    let query = Query::builder()
         .keyspace(keyspace)
         .query("SELECT id, login, emails FROM users WHERE id = :id")
         .bind_name("id", id)

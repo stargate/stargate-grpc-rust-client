@@ -19,9 +19,9 @@ impl From<Vec<Value>> for Values {
 ///
 /// # Example
 /// ```
-/// use stargate_grpc::{QueryBuilder, Consistency};
+/// use stargate_grpc::{Query, Consistency};
 ///
-/// let query = QueryBuilder::new()
+/// let query = Query::builder()
 ///     .keyspace("ks")
 ///     .consistency(Consistency::LocalQuorum)
 ///     .query("SELECT * FROM table WHERE year = :year and month = :month")
@@ -36,9 +36,9 @@ impl From<Vec<Value>> for Values {
 ///
 /// # Example
 /// ```
-/// use stargate_grpc::{QueryBuilder, Consistency};
+/// use stargate_grpc::{Query, Consistency};
 ///
-/// let query_defaults = QueryBuilder::new()
+/// let query_defaults = Query::builder()
 ///     .keyspace("ks")
 ///     .consistency(Consistency::LocalQuorum);
 ///
@@ -73,16 +73,16 @@ impl QueryBuilder {
     ///
     /// # Example
     /// ```
-    /// use stargate_grpc::{QueryBuilder, Value};
+    /// use stargate_grpc::{Query, Value};
     ///
     /// let cql = "SELECT * FROM table WHERE year = ? and month = ?";
     ///
-    /// let query1 = QueryBuilder::new()
+    /// let query1 = Query::builder()
     ///     .query(cql)
     ///     .bind((2021, "October"))
     ///     .build();
     ///
-    /// let query2 = QueryBuilder::new()
+    /// let query2 = Query::builder()
     ///     .query(cql)
     ///     .bind(vec![Value::int(2021), Value::string("October")])
     ///     .build();
@@ -105,9 +105,9 @@ impl QueryBuilder {
     ///
     /// # Example
     /// ```
-    /// use stargate_grpc::QueryBuilder;
+    /// use stargate_grpc::Query;
     ///
-    /// let query = QueryBuilder::new()
+    /// let query = Query::builder()
     ///     .query("SELECT * FROM table WHERE year = ? and month = ?")
     ///     .bind_ith(0, 2021)
     ///     .bind_ith(1, "October")
@@ -124,9 +124,9 @@ impl QueryBuilder {
     ///
     /// # Example
     /// ```
-    /// use stargate_grpc::QueryBuilder;
+    /// use stargate_grpc::Query;
     ///
-    /// let query = QueryBuilder::new()
+    /// let query = Query::builder()
     ///     .query("SELECT * FROM table WHERE year = :year and month = :month")
     ///     .bind_name("year", 2021)
     ///     .bind_name("month", "October")
@@ -152,9 +152,9 @@ impl QueryBuilder {
     /// Sets the consistency level of the query.
     /// # Example
     /// ```
-    /// use stargate_grpc::{Consistency, QueryBuilder};
+    /// use stargate_grpc::{Consistency, Query};
     ///
-    /// let query = QueryBuilder::new()
+    /// let query = Query::builder()
     ///     .query("SELECT * FROM table")
     ///     .consistency(Consistency::One);
     /// ```
@@ -229,13 +229,20 @@ impl QueryBuilder {
     }
 }
 
+impl Query {
+    /// Returns a fresh builder for building a query
+    pub fn builder() -> QueryBuilder {
+        QueryBuilder::new()
+    }
+}
+
 /// Builds a batch of queries.
 ///
 /// # Example
 /// ```
-/// use stargate_grpc::{BatchBuilder, Consistency};
+/// use stargate_grpc::{Batch, Consistency};
 ///
-/// let batch = BatchBuilder::new()
+/// let batch = Batch::builder()
 ///     .keyspace("example")
 ///     .consistency(Consistency::LocalQuorum)
 ///     .query("INSERT INTO users (id, login, email) VALUES (?, ?, ?)")
@@ -371,6 +378,13 @@ impl BatchBuilder {
                 values: self.payload.build(),
             });
         }
+    }
+}
+
+impl Batch {
+    /// Returns a fresh builder for building a batch of queries
+    pub fn builder() -> BatchBuilder {
+        BatchBuilder::new()
     }
 }
 

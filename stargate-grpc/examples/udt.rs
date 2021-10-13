@@ -18,7 +18,7 @@ struct Address {
 }
 
 async fn create_schema(client: &mut StargateClient, keyspace: &str) -> anyhow::Result<()> {
-    let create_type = QueryBuilder::new()
+    let create_type = Query::builder()
         .keyspace(keyspace)
         .query(
             "CREATE TYPE IF NOT EXISTS address(\
@@ -27,7 +27,7 @@ async fn create_schema(client: &mut StargateClient, keyspace: &str) -> anyhow::R
                     apartment BIGINT)",
         )
         .build();
-    let create_table = QueryBuilder::new()
+    let create_table = Query::builder()
         .keyspace(keyspace)
         .query(
             "CREATE TABLE IF NOT EXISTS users_with_addr(\
@@ -42,7 +42,7 @@ async fn create_schema(client: &mut StargateClient, keyspace: &str) -> anyhow::R
 }
 
 async fn insert_data(client: &mut StargateClient, keyspace: &str) -> anyhow::Result<()> {
-    let insert = QueryBuilder::new()
+    let insert = Query::builder()
         .keyspace(keyspace)
         .query("INSERT INTO users_with_addr(id, addresses) VALUES (:id, :addr)")
         .bind_name("id", 1)
@@ -68,7 +68,7 @@ async fn insert_data(client: &mut StargateClient, keyspace: &str) -> anyhow::Res
 }
 
 async fn print_all_users(client: &mut StargateClient, keyspace: &str) -> anyhow::Result<()> {
-    let select = QueryBuilder::new()
+    let select = Query::builder()
         .keyspace(keyspace)
         .query("SELECT id, addresses FROM users_with_addr")
         .build();

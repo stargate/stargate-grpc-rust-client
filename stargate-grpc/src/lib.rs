@@ -73,8 +73,8 @@
 //! Use a [`QueryBuilder`] to create a query, bind query arguments and pass query parameters:
 //!
 //! ```rust
-//! use stargate_grpc::{Consistency, QueryBuilder};
-//! let query = QueryBuilder::new()
+//! use stargate_grpc::{Consistency, Query};
+//! let query = Query::builder()
 //!     .keyspace("test")                              // set the keyspace the query applies to
 //!     .consistency(Consistency::LocalQuorum)         // set consistency level
 //!     .query("SELECT * FROM users WHERE id = :id")   // set CQL query text (required)
@@ -159,8 +159,8 @@
 //! Values can be used in [`QueryBuilder::bind`] or [`QueryBuilder::bind_name`]:
 //!
 //! ```rust
-//! use stargate_grpc::{QueryBuilder, Value};
-//! let query = QueryBuilder::new()
+//! use stargate_grpc::{Query, Value};
+//! let query = Query::builder()
 //!     .query("SELECT login, emails FROM users WHERE id = :id")
 //!     .bind_name("id", Value::int(1000))
 //!     .build();
@@ -227,8 +227,7 @@
 pub use client::{AuthToken, StargateClient};
 pub use from_value::TryFromValue;
 pub use into_value::{DefaultGrpcType, IntoValue};
-pub use proto::{Consistency, Query, ResultSet, Row, Value};
-pub use query::{BatchBuilder, QueryBuilder};
+pub use proto::{Batch, Consistency, Query, ResultSet, Row, Value};
 #[cfg(feature = "stargate-grpc-derive")]
 pub use stargate_grpc_derive::*;
 
