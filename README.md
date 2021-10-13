@@ -10,13 +10,13 @@ utilities that make them easier to work with.
    - [Querying](#querying)
    - [Processing the result set](#processing-the-result-set)
 - [Building](#building-from-source)
-- [Running the example](#running-the-example)
+- [Running the examples](#running-the-examples)
 
 ## Features
 - All of the Stargate gRPC protocol messages exposed as Rust structures and enums
 - Token-based authentication
 - Asynchronous querying
-- Query builder with easy binding of variables by names or positions
+- Query builder with easy binding of variables by names or positions 
 - Optional compile-time type-checking of query bind values
 - Easy conversions between gRPC value types and common Rust types; support for
   primitive types, lists, maps, tuples and user-defined-types, with arbitrary nesting levels
@@ -24,15 +24,27 @@ utilities that make them easier to work with.
 
 ## Quick start guide
 Add required dependencies. You'll need at least `stargate-grpc` and an async framework, 
-e.g. tokio:
+e.g. [tokio](https://tokio.rs/) or [async-std](https://async.rs/). 
+
+_Caution! Currently this repo is private and the project hasn't been published on crates.io. 
+Until that happens, you need to point Cargo to this repository using the git SSH link._
 
 ```toml
 [dependencies]
-stargate-grpc = { git = "https://github.com/stargate/stargate-grpc-rust-client" }
+stargate-grpc = { git = "ssh://git@github.com/stargate/stargate-grpc-rust-client.git" }
 tokio = { version = "1", features = ["full"]}
 ```
 
-Add the following line to the includes in the source code of your app:
+_In order to allow Cargo to authenticate with GitHub keys, put this in `~/.cargo/config`_:
+```toml
+[net]
+git-fetch-with-cli = true
+```
+
+At this point you should be able to build the project now with `cargo build` and it would fetch and compile 
+the dependencies. 
+
+For convenience, add the following line to the includes in the source code of your app:
 ```rust
 use stargate_grpc::*;
 ```
