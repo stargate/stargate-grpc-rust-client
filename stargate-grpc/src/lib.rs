@@ -70,7 +70,8 @@
 //! ```
 //!
 //! ### Querying
-//! Use a [`QueryBuilder`] to create a query, bind query arguments and pass query parameters:
+//! Call [`Query::builder`] to set a CQL string, bind query arguments
+//! set query parameters and finally produce a `Query`:
 //!
 //! ```rust
 //! use stargate_grpc::{Consistency, Query};
@@ -94,7 +95,7 @@
 //! # }
 //! ```
 //!
-//! If you need to send more than one query in a single request, use a [`BatchBuilder`].
+//! If you need to send more than one query in a single request, create a [`Batch`].
 //! All queries in the batch will share the same parameters, such as
 //! keyspace, consistency level or timestamp. Send the batch for execution with
 //! [`StargateClient::execute_batch`].
@@ -115,22 +116,41 @@
 //! # }
 //! ```
 //!
-//! It is also possible to read each field separately and convert it to desired type, without
-//! dropping the original `row`:
+//! It is also possible to read each field separately and convert it to desired type:
 //! ```rust
 //! # use std::convert::TryInto;
 //! # use stargate_grpc::ResultSet;
 //! # fn process_results(result_set: ResultSet) -> anyhow::Result<()> {
-//! for row in result_set.rows {
-//!     let login: String = row.get(0)?;
-//!     let emails: Vec<String> = row.get(1)?;
+//! for mut row in result_set.rows {
+//!     let login: String = row.try_take(0)?;
+//!     let emails: Vec<String> = row.try_take(1)?;
 //!     // ...
 //! }
 //! # Ok(())
 //! # }
 //! ```
 //!
+//! Finally, you can convert a whole `Row` into a struct with a mapper obtained
+//! from [`ResultSet::mapper`](ResultSet::mapper):
 //!
+//! ```
+//! use stargate_grpc::{TryFromRow, ResultSet};
+//! # fn process_results(result_set: ResultSet) -> anyhow::Result<()> {
+//!
+//! #[derive(TryFromRow)]
+//! struct User {
+//!     login: String,
+//!     emails: Vec<String>
+//! }
+//!
+//! let mapper = result_set.mapper()?;
+//! for row in result_set.rows {
+//!     let user: User = mapper.try_unpack(row)?;
+//!     // ...
+//! }
+//! # Ok(())
+//! # }
+//! ```
 //!
 //! ## Representation of values
 //!
@@ -156,7 +176,7 @@
 //! let heterogeneous_list = vec![Value::int(1), Value::double(3.14)];
 //! ```
 //!
-//! Values can be used in [`QueryBuilder::bind`] or [`QueryBuilder::bind_name`]:
+//! Values can be used in calls to `bind` or `bind_name` used when building queries or batches:
 //!
 //! ```rust
 //! use stargate_grpc::{Query, Value};

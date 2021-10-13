@@ -138,8 +138,18 @@ pub trait TryFromValue: Sized {
 }
 
 impl Value {
+    /// Attempts to convert the value into a different type
+    /// for which we have a `TryFromValue` implementation.
     pub fn try_into<T: TryFromValue>(self) -> Result<T, ConversionError> {
         T::try_from(self)
+    }
+
+    /// Moves the value out, and leaves an empty inner slot.
+    /// This is useful for taking values out of a vector.
+    pub fn take(&mut self) -> Value {
+        Value {
+            inner: self.inner.take(),
+        }
     }
 }
 
@@ -671,16 +681,16 @@ mod test {
     #[test]
     fn convert_row_to_i64() {
         let values = vec![Value::int(1)];
-        let row = Row { values };
-        let int: i64 = row.try_into_one().unwrap();
+        let mut row = Row { values };
+        let int: i64 = row.try_take(0).unwrap();
         assert_eq!(int, 1);
     }
 
     #[test]
     fn convert_row_to_list() {
         let values = vec![Value::list(vec![1, 2, 3])];
-        let row = Row { values };
-        let int: Vec<i64> = row.try_into_one().unwrap();
+        let mut row = Row { values };
+        let int: Vec<i64> = row.try_take(0).unwrap();
         assert_eq!(int, vec![1, 2, 3]);
     }
 
@@ -697,10 +707,22 @@ mod test {
     #[test]
     fn convert_single_item_of_a_row() {
         let values = vec![Value::int(1), Value::double(2.0), Value::string("foo")];
+        let mut row = Row { values };
+        let a: i64 = row.try_take(0).unwrap();
+        let b: f64 = row.try_take(1).unwrap();
+        let c: String = row.try_take(2).unwrap();
+        assert_eq!(a, 1);
+        assert_eq!(b, 2.0);
+        assert_eq!(c, "foo".to_string());
+    }
+
+    #[test]
+    fn convert_copy_of_single_item_of_a_row() {
+        let values = vec![Value::int(1), Value::double(2.0), Value::string("foo")];
         let row = Row { values };
-        let a: i64 = row.get(0).unwrap();
-        let b: f64 = row.get(1).unwrap();
-        let c: String = row.get(2).unwrap();
+        let a: i64 = row.try_get(0).unwrap();
+        let b: f64 = row.try_get(1).unwrap();
+        let c: String = row.try_get(2).unwrap();
         assert_eq!(a, 1);
         assert_eq!(b, 2.0);
         assert_eq!(c, "foo".to_string());
