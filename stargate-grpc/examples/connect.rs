@@ -1,23 +1,19 @@
 //! Demonstrates how to connect to Stargate
 
-use stargate_grpc::StargateClient;
-use tonic::transport::Endpoint;
-
 use config::Config;
-use stargate_grpc::client::default_tls_config;
+use stargate_grpc::StargateClient;
 
 #[path = "config.rs"]
 pub mod config;
 
 /// Connects to Stargate and returns a client that can run queries.
 pub async fn connect(config: &Config) -> anyhow::Result<StargateClient> {
-    let mut endpoint = Endpoint::new(config.url.clone())?;
-    if config.tls {
-        let tls_config = default_tls_config()?;
-        endpoint = endpoint.tls_config(tls_config)?;
-    }
-    let channel = endpoint.connect().await?;
-    Ok(StargateClient::with_auth(channel, config.token.clone()))
+    Ok(StargateClient::builder()
+        .uri(config.url.as_str())?
+        .auth_token(config.token.clone())
+        .tls(config.tls_config()?)
+        .connect()
+        .await?)
 }
 
 #[allow(unused)]

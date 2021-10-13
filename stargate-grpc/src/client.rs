@@ -1,13 +1,13 @@
 //! Enhances the automatically generated gRPC Stargate client with token-based authentication.
 
-use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
+use tonic::codegen::http::uri::InvalidUri;
 use tonic::codegen::InterceptedService;
 use tonic::metadata::AsciiMetadataValue;
 use tonic::service::Interceptor;
-use tonic::transport::ClientTlsConfig;
+use tonic::transport::{ClientTlsConfig, Endpoint};
 use tonic::{Request, Status};
 
 use crate::proto::stargate_client;
@@ -25,7 +25,7 @@ impl Display for InvalidAuthToken {
     }
 }
 
-impl Error for InvalidAuthToken {}
+impl std::error::Error for InvalidAuthToken {}
 
 /// Stores a token for authenticating to Stargate.
 ///
@@ -88,6 +88,11 @@ impl StargateClient {
     pub fn with_auth(channel: tonic::transport::Channel, token: AuthToken) -> Self {
         stargate_client::StargateClient::with_interceptor(channel, token)
     }
+
+    /// Returns a builder to setup the client
+    pub fn builder() -> StargateClientBuilder {
+        Default::default()
+    }
 }
 
 /// Returns the default TLS config with root certificates imported from the OS.
@@ -100,4 +105,53 @@ pub fn default_tls_config() -> std::io::Result<ClientTlsConfig> {
         Err((None, e)) => return Err(e),
     };
     Ok(ClientTlsConfig::default().rustls_client_config(rustls_config))
+}
+
+/// Makes building and connecting to Stargate easier.
+#[derive(Default)]
+pub struct StargateClientBuilder {
+    token: Option<AuthToken>,
+    tls_config: Option<ClientTlsConfig>,
+    endpoint: Option<Endpoint>,
+}
+
+impl StargateClientBuilder {
+    pub fn new() -> StargateClientBuilder {
+        Default::default()
+    }
+
+    /// Sets the stargate authentication token for authenticating the requests. Mandatory.
+    pub fn auth_token(mut self, token: AuthToken) -> Self {
+        self.token = Some(token);
+        self
+    }
+
+    /// If `tls` is some, enables TLS with a non-default configuration.
+    pub fn tls(mut self, tls: Option<ClientTlsConfig>) -> Self {
+        self.tls_config = tls;
+        self
+    }
+
+    /// Sets the URL to connect to. Mandatory.
+    pub fn uri(mut self, s: impl ToString) -> Result<Self, InvalidUri> {
+        self.endpoint = Some(Endpoint::from_str(s.to_string().as_str())?);
+        Ok(self)
+    }
+
+    /// Tries to connect to Stargate.
+    ///
+    /// # Errors
+    /// Returns tonic transport error if the connection cannot be established.
+    ///
+    /// # Panics
+    /// Panics if some mandatory settings hasn't been set.
+    pub async fn connect(self) -> Result<StargateClient, tonic::transport::Error> {
+        let token = self.token.expect("Authentication token");
+        let mut endpoint = self.endpoint.expect("Endpoint");
+        if let Some(tls) = self.tls_config {
+            endpoint = endpoint.tls_config(tls)?
+        }
+        let channel = endpoint.connect().await?;
+        Ok(StargateClient::with_auth(channel, token))
+    }
 }

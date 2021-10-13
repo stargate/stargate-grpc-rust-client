@@ -1,7 +1,12 @@
 //! Command-line configuration shared by all examples.
 //! This is also an executable demo. It prints the received configuration to stdout.
 
+use std::io;
+
 use clap::Clap;
+use tonic::transport::ClientTlsConfig;
+
+use stargate_grpc::client::default_tls_config;
 use stargate_grpc::AuthToken;
 
 #[derive(Clap, Debug)]
@@ -27,6 +32,14 @@ pub struct Config {
 impl Config {
     pub fn from_args() -> Config {
         Config::parse()
+    }
+
+    pub fn tls_config(&self) -> io::Result<Option<ClientTlsConfig>> {
+        if self.tls {
+            Ok(Some(default_tls_config()?))
+        } else {
+            Ok(None)
+        }
     }
 }
 

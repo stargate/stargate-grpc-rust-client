@@ -18,44 +18,51 @@
 //!
 //! ```toml
 //! [devependencies]
-//! stargate-grpc = { git = "https://github.com/stargate/stargate-grpc-rust-client" }
+//! stargate-grpc = "0.1.0"
 //! tokio = { version = "1", features = ["full"]}
 //! ```
 //!
 //!
 //! ### Establishing the connection
 //! The main structure that provides the interface to Stargate is [`StargateClient`].
-//! Pass the channel and Stargate authentication token to
-//! [`StargateClient::with_auth`] to obtain an instance of the client:
+//! The simplest way to obtain an instance is to use the provided
+//! [`builder`](StargateClient::builder):
 //!
-//! ```rust
+//! ```
 //! use std::str::FromStr;
-//! use tonic::transport::Endpoint;
-//! use stargate_grpc::client::{AuthToken, StargateClient};
+//! use stargate_grpc::client::{default_tls_config, AuthToken, StargateClient};
 //!
 //! # async fn connect() -> anyhow::Result<()>{
-//! let url = "http://localhost:8090";                           // Stargate URL
-//! let token = "00000000-0000-0000-0000-000000000000";          // authentication token
-//! let token = AuthToken::from_str(token).unwrap();
-//! let channel = Endpoint::new(url)?.connect().await?;          // connect to the server
-//! let mut client = StargateClient::with_auth(channel, token);  // create authenticating client
+//! let uri = "http://localhost:8090/";                    // Stargate URI
+//! let token = "00000000-0000-0000-0000-000000000000";    // Stargate authentication token
+//! let token = AuthToken::from_str(token)?;
+//! let mut client = StargateClient::builder()
+//!     .uri(uri)?
+//!     .auth_token(token)
+//!     .tls(Some(default_tls_config()?))                  // optionally to enable TLS
+//!     .connect()
+//!     .await?;
 //! # Ok(())
 //! # }
 //! ```
 //!
-//! If the server requires a secure connection, you need to enable TLS:
+//! If you want to control the properties of the connection which are not exposed by the builder,
+//! add [`tonic`](https://docs.rs/tonic/0.5.2/tonic/) to the dependencies of the project and create
+//! the connection manually. Then use [`StargateClient::with_auth`] to wrap the connection and
+//! the authentication token:
 //!
-//! ```rust
+//! ```
 //! # use std::str::FromStr;
-//! # use tonic::transport::Endpoint;
+//! use std::time::Duration;
 //! # use stargate_grpc::client::{default_tls_config, AuthToken, StargateClient};
 //! #
 //! # async fn connect() -> anyhow::Result<()>{
-//! # let url = "http://localhost:8090";
+//! # let uri = "http://localhost:8090";
 //! # let token = "00000000-0000-0000-0000-000000000000";
 //! # let token = AuthToken::from_str(token).unwrap();
-//! let channel = Endpoint::new(url)?
-//!     .tls_config(default_tls_config()?)?
+//! let channel = tonic::transport::Endpoint::new(uri)?
+//!     .connect_timeout(Duration::from_secs(30))
+//!     .tcp_nodelay(true)
 //!     .connect().await?;
 //! let mut client = StargateClient::with_auth(channel, token);
 //! # Ok(())

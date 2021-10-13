@@ -50,16 +50,16 @@ use stargate_grpc::*;
 ```
 
 ### Connecting
-The main structure that provides the interface to Stargate is `StargateClient`. 
-Pass the connection channel and the Stargate authentication token to `with_auth` to obtain 
-an instance of the client:
+The main structure that provides the interface to Stargate is `StargateClient`.
+The simplest way to obtain an instance is to use the provided `builder`:
 
 ```rust
-let url = "http://localhost:8090";                   // substitute with a Stargate URL
-let token = "00000000-0000-0000-0000-000000000000";  // substitute with an authentication token
-let token = AuthToken::from_str(token).unwrap();
-let channel = Endpoint::new(url)?.connect().await?;          // connect to the server
-let mut client = StargateClient::with_auth(channel, token);  // create authenticating client
+let mut client = StargateClient::builder()
+    .uri("http://localhost:8090/")?
+    .auth_token(AuthToken::from_str("00000000-0000-0000-0000-000000000000")?)                                         
+    .tls(Some(client::default_tls_config()?))   // optional
+    .connect()
+    .await?;
 ```
 
 ### Querying 
