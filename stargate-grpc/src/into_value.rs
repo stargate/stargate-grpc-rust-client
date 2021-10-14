@@ -49,10 +49,10 @@
 //! |-------------------------------|------------------------------------
 //! | `i8`                          | [`types::Int`]
 //! | `i16`                         | [`types::Int`]
-//! | `i32`                         | [`types::Int`]
+//! | `i32`                         | [`types::Int`] [`types::Date`]
 //! | `i64`                         | [`types::Int`]
 //! | `u16`                         | [`types::Int`]
-//! | `u32`                         | [`types::Int`], [`types::Date`]
+//! | `u32`                         | [`types::Int`]
 //! | `u64`                         | [`types::Time`]
 //! | `f32`                         | [`types::Float`]
 //! | `f64`                         | [`types::Double`]
@@ -302,12 +302,12 @@ impl DefaultGrpcType for proto::Varint {
 }
 
 impl DefaultGrpcType for SystemTime {
-    type C = types::Int;
+    type C = types::Timestamp;
 }
 
 #[cfg(feature = "chrono")]
 impl<Tz: chrono::TimeZone> DefaultGrpcType for chrono::DateTime<Tz> {
-    type C = types::Int;
+    type C = types::Timestamp;
 }
 
 #[cfg(feature = "chrono")]
@@ -606,6 +606,11 @@ impl Value {
         value.into_value()
     }
 
+    /// Constructs a CQL `timestamp` value.
+    pub fn timestamp(value: impl IntoValue<types::Timestamp>) -> Value {
+        value.into_value()
+    }
+
     /// Constructs a CQL `uuid` or `timeuuid` value.
     pub fn uuid(value: impl IntoValue<types::Uuid>) -> Value {
         value.into_value()
@@ -848,8 +853,9 @@ gen_conversion!(u32 => types::Int; x => Value::raw_int(x as i64));
 gen_conversion!(u16 => types::Int; x => Value::raw_int(x as i64));
 gen_conversion!(u8 => types::Int; x => Value::raw_int(x as i64));
 
-gen_conversion!(u32 => types::Date; x => Value::raw_date(x));
+gen_conversion!(i32 => types::Date; x => Value::raw_date((x as i64 - i32::MIN as i64) as u32));
 gen_conversion!(u64 => types::Time; x => Value::raw_time(x));
+gen_conversion!(i64 => types::Timestamp; x => Value::raw_int(x));
 
 gen_conversion!(f32 => types::Float; x => Value::raw_float(x));
 gen_conversion!(f64 => types::Double; x => Value::raw_double(x));
@@ -874,7 +880,7 @@ gen_conversion!(proto::Uuid => types::Uuid; x =>
     Value::raw_uuid(&x.value.try_into().expect("16 bytes")));
 gen_conversion!(proto::Varint => types::Varint; x => Value::raw_varint(x.value));
 
-gen_conversion!(SystemTime => types::Int; x =>
+gen_conversion!(SystemTime => types::Timestamp; x =>
     Value::raw_int(x.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as i64));
 
 #[cfg(feature = "uuid")]
@@ -1062,7 +1068,7 @@ where
 }
 
 #[cfg(feature = "chrono")]
-impl<Tz: chrono::TimeZone> IntoValue<types::Int> for chrono::DateTime<Tz> {
+impl<Tz: chrono::TimeZone> IntoValue<types::Timestamp> for chrono::DateTime<Tz> {
     fn into_value(self) -> Value {
         Value::raw_int(self.timestamp_millis())
     }
@@ -1072,7 +1078,7 @@ impl<Tz: chrono::TimeZone> IntoValue<types::Int> for chrono::DateTime<Tz> {
 impl<Tz: chrono::TimeZone> IntoValue<types::Date> for chrono::Date<Tz> {
     fn into_value(self) -> Value {
         use chrono::Datelike;
-        Value::raw_date(self.num_days_from_ce() as u32)
+        Value::date(self.num_days_from_ce())
     }
 }
 
@@ -1186,7 +1192,7 @@ mod test {
         let unix_time = time.duration_since(UNIX_EPOCH).unwrap().as_millis() as i64;
         let value1 = Value::from(time);
         assert_eq!(value1, Value::int(unix_time));
-        let value2 = Value::int(time);
+        let value2 = Value::timestamp(time);
         assert_eq!(value2, Value::int(unix_time));
     }
 
@@ -1196,9 +1202,9 @@ mod test {
         let time = chrono::Utc::now();
         let unix_time = time.timestamp_millis() as i64;
         let value1 = Value::from(time);
-        assert_eq!(value1, Value::int(unix_time));
-        let value2 = Value::int(time);
-        assert_eq!(value2, Value::int(unix_time));
+        assert_eq!(value1, Value::timestamp(unix_time));
+        let value2 = Value::timestamp(time);
+        assert_eq!(value2, Value::timestamp(unix_time));
     }
 
     #[test]
@@ -1207,7 +1213,7 @@ mod test {
         let time = chrono::Local::now();
         let unix_time = time.timestamp_millis() as i64;
         let value = Value::from(time);
-        assert_eq!(value, Value::int(unix_time));
+        assert_eq!(value, Value::timestamp(unix_time));
     }
 
     #[test]
@@ -1215,7 +1221,7 @@ mod test {
     fn convert_chrono_utc_date_into_value() {
         use chrono::Datelike;
         let date = chrono::Utc::now().date();
-        let days = date.num_days_from_ce() as u32;
+        let days = date.num_days_from_ce();
         let value = Value::from(date);
         assert_eq!(value, Value::date(days));
         let value = Value::date(date);
@@ -1227,7 +1233,7 @@ mod test {
     fn convert_chrono_local_date_into_value() {
         use chrono::Datelike;
         let date = chrono::Local::now().date();
-        let days = date.num_days_from_ce() as u32;
+        let days = date.num_days_from_ce();
         let value = Value::from(date);
         assert_eq!(value, Value::date(days));
     }
@@ -1302,9 +1308,13 @@ mod test {
 
     #[test]
     fn convert_vec_of_dates_into_value() {
-        let list = vec![1, 2];
+        let list = vec![i32::MIN, 0, i32::MAX];
         let v = Value::of_type(List(Date), list);
-        assert_eq!(v, Value::list(vec![Value::date(1), Value::date(2)]));
+        assert_eq!(v, Value::list(
+            vec![
+                Value::raw_date(0),
+                Value::raw_date(1 << 31),
+                Value::raw_date(u32::MAX)]));
     }
 
     #[test]

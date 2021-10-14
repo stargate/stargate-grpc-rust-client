@@ -38,6 +38,8 @@ pub struct String;
 impl ConcreteType for String {}
 pub struct Time;
 impl ConcreteType for Time {}
+pub struct Timestamp;
+impl ConcreteType for Timestamp {}
 pub struct Udt;
 impl ConcreteType for Udt {}
 pub struct Uuid;

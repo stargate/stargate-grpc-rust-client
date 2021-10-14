@@ -218,18 +218,33 @@
 //! It allows an easy integration with external structures instead.
 //!
 //! A time value is internally represented as an `u64` number of nanoseconds elapsed
-//! since midnight.
-//! A date is internally represented as an `u32` number of days elapsed
-//! since Unix epoch. Dates before Unix epoch are not representable.
+//! since midnight. Hence, `Value::time(0)` denotes midnight.
+//!
+//! A date is internally represented as an `u32` number where value 2^31 denotes Unix Epoch.
+//! For convenience and compatibility with most other date representations, values are convertible
+//! to and from `i32` type where 0 denotes the Unix Epoch. Therefore the Unix Epoch can be simply
+//! written as `Value::date(0)` which is equivalent to `Value::raw_date(1 << 31)`.
+//!
 //! A timestamp is internally represented as an `i64` number of milliseconds
 //! elapsed since Unix epoch. Timestamps can be negative.
-//! You can convert integer types directly to and from time, date and timestamp values.
 //!
-//! To get automatic conversions to and from
+//! Using integers to represent dates is error-prone, therefore
+//! this library comes with conversions
+//! from higher-level structures like [`SystemTime`](std::time::SystemTime):
+//!
+//! ```rust
+//! use std::time::SystemTime;
+//! use stargate_grpc::Value;
+//!
+//! let unix_epoch_1 = Value::timestamp(SystemTime::UNIX_EPOCH);
+//! let unix_epoch_2 = Value::timestamp(0);
+//! assert_eq!(unix_epoch_1, unix_epoch_2);
+//! ```
+//!
+//! More time related features are provided by an optional `chrono` feature.
+//! If you enable `chrono` feature, you get conversions for
 //! [`chrono::Date`](https://docs.rs/chrono/0.4/chrono/struct.Date.html) and
-//! [`chrono::DateTime`](https://docs.rs/chrono/0.4/chrono/struct.DateTime.html)
-//! include [`chrono`](https://crates.io/crates/chrono) on the dependency list and
-//! enable feature `chrono`.
+//! [`chrono::DateTime`](https://docs.rs/chrono/0.4/chrono/struct.DateTime.html).
 //!
 //! ```toml
 //! [dependencies]

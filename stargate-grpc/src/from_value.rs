@@ -25,13 +25,14 @@
 //! `Boolean`     | `bool`
 //! `Bytes`       | `Vec<u8>`
 //! `Inet`        | [`proto::Inet`]
-//! `Int`         | `i64`, `std::time::SystemTime`,`chrono::DateTime<Local>`, `chrono::DateTime<Utc>`
+//! `Int`         | `i64`,
 //! `Double`      | `f64`
-//! `Date`        | `u32`, `chrono::Date<Local>`, `chrono::Date<Utc>`
+//! `Date`        | `i32`, `chrono::Date<Local>`, `chrono::Date<Utc>`
 //! `Decimal`     | [`proto::Decimal`]
 //! `Float`       | `f32`
 //! `String`      | `String`
 //! `Time`        | `u64`
+//! `Timestamp`   | `std::time::SystemTime`,`chrono::DateTime<Local>`, `chrono::DateTime<Utc>`
 //! `Uuid`        | [`proto::Uuid`], `uuid::Uuid`
 //! `Udt`         | [`proto::UdtValue`]
 //! `Varint`      | [`proto::Varint`]
@@ -206,7 +207,7 @@ macro_rules! gen_conversion {
 
 gen_conversion!(bool; value::Inner::Boolean(x) => Ok(x));
 gen_conversion!(i64; value::Inner::Int(x) => Ok(x));
-gen_conversion!(u32; value::Inner::Date(x) => Ok(x));
+gen_conversion!(i32; value::Inner::Date(x) => Ok((x as i64 + i32::MIN as i64) as i32));
 gen_conversion!(u64; value::Inner::Time(x) => Ok(x));
 gen_conversion!(f32; value::Inner::Float(x) => Ok(x));
 gen_conversion!(f64; value::Inner::Double(x) => Ok(x));
@@ -252,9 +253,11 @@ gen_conversion!(chrono::DateTime<chrono::Local>; value::Inner::Int(millis) => {
 
 #[cfg(feature = "chrono")]
 fn into_naive_date(days: u32) -> Result<chrono::NaiveDate, ConversionError> {
-    use std::convert::TryInto;
+    let days: i32 = (days as i64 + i32::MIN as i64) as i32;
     let err = || ConversionError::out_of_range::<_, chrono::Date<chrono::Local>>(days);
-    let days: i32 = days.try_into().map_err(|_| err())?;
+    if days > i32::MAX - 365 {  // protect from chrono numerical overflow
+        return Err(err());
+    }
     chrono::NaiveDate::from_num_days_from_ce_opt(days).ok_or_else(err)
 }
 
@@ -555,9 +558,13 @@ mod test {
     #[cfg(feature = "chrono")]
     fn convert_value_to_chrono_date() {
         use chrono::Datelike;
-        let v = Value::date(10000);
+        let v = Value::date(0);
         let date: chrono::Date<chrono::Utc> = v.try_into().unwrap();
-        assert_eq!(date.num_days_from_ce(), 10000);
+        assert_eq!(date.num_days_from_ce(), 0);
+
+        let v = Value::date(100_000);
+        let date: chrono::Date<chrono::Utc> = v.try_into().unwrap();
+        assert_eq!(date.num_days_from_ce(), 100_000);
     }
 
     #[test]
