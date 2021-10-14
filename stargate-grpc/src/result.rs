@@ -41,7 +41,7 @@ impl Row {
     /// use stargate_grpc::{Row, Value};
     ///
     /// let mut row = Row {
-    ///     values: vec![Value::int(1), Value::string("foo")]
+    ///     values: vec![Value::bigint(1), Value::string("foo")]
     /// };
     ///
     /// let id: i64 = row.try_take(0).unwrap();
@@ -76,7 +76,7 @@ impl Row {
     /// use stargate_grpc::{Row, Value};
     ///
     /// let row = Row {
-    ///     values: vec![Value::int(1), Value::string("foo")]
+    ///     values: vec![Value::bigint(1), Value::string("foo")]
     /// };
     ///
     /// let id: i64 = row.try_get(0).unwrap();
@@ -205,6 +205,8 @@ impl ResultSet {
     ///
     /// # Example
     /// ```
+    /// # #[cfg(feature = "macros")]
+    /// # {
     /// use stargate_grpc::*;
     /// use stargate_grpc::proto::*;
     ///
@@ -234,6 +236,7 @@ impl ResultSet {
     ///     assert_eq!(user.id, 1);
     ///     assert_eq!(user.login, "user_1");
     /// }
+    /// # }
     /// ```
     pub fn mapper<T>(&self) -> Result<ResultSetMapper<T>, MapperError>
     where

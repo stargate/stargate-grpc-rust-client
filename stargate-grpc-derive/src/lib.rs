@@ -6,8 +6,8 @@
 //!
 //! ## Converting a Rust struct to a `Value`
 //! ```
-//! use stargate_grpc::{IntoValue, Value};
-//!
+//! use stargate_grpc::Value;
+//! use stargate_grpc_derive::IntoValue;
 //! #[derive(IntoValue)]
 //! struct User {
 //!     id: i64,
@@ -17,12 +17,13 @@
 //! let user = User { id: 1, login: "user" };
 //! let value = Value::from(user);
 //!
-//! assert_eq!(value, Value::udt(vec![("id", Value::int(1)), ("login", Value::string("user"))]))
+//! assert_eq!(value, Value::udt(vec![("id", Value::bigint(1)), ("login", Value::string("user"))]))
 //! ```
 //!
 //! ## Converting a `Value` to a Rust struct
 //! ```
-//! use stargate_grpc::{TryFromValue, Value};
+//! use stargate_grpc::Value;
+//! use stargate_grpc_derive::TryFromValue;
 //!
 //! #[derive(TryFromValue)]
 //! struct User {
@@ -30,7 +31,7 @@
 //!     login: String
 //! }
 //!
-//! let value = Value::udt(vec![("id", Value::int(1)), ("login", Value::string("user"))]);
+//! let value = Value::udt(vec![("id", Value::bigint(1)), ("login", Value::string("user"))]);
 //! let user: User = value.try_into().unwrap();
 //!
 //! assert_eq!(user.id, 1);
@@ -43,7 +44,8 @@
 //! [`std::convert::Into<Values>`] trait. You can derive such trait automatically:
 //!
 //! ```
-//! use stargate_grpc::{IntoValues, Query};
+//! use stargate_grpc::Query;
+//! use stargate_grpc_derive::IntoValues;
 //!
 //! #[derive(IntoValues)]
 //! struct User {
@@ -77,7 +79,7 @@
 //! Obtains the default value by evaluating given Rust expression given as a string.
 //!
 //! ```
-//! use stargate_grpc::TryFromValue;
+//! use stargate_grpc_derive::TryFromValue;
 //!
 //! fn default_file_name() -> String {
 //!     "file.txt".to_string()
@@ -95,7 +97,8 @@
 //! when there are multiple possibilities.
 //!
 //! ```
-//! use stargate_grpc::{types, IntoValue};
+//! use stargate_grpc::types;
+//! use stargate_grpc_derive::IntoValue;
 //!
 //! #[derive(IntoValue)]
 //! struct InetAndUuid {

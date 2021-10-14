@@ -134,7 +134,9 @@
 //! from [`ResultSet::mapper`](ResultSet::mapper):
 //!
 //! ```
-//! use stargate_grpc::{TryFromRow, ResultSet};
+//! # #[cfg(feature = "macros")]
+//! # {
+//! use stargate_grpc::{ResultSet, TryFromRow};
 //! # fn process_results(result_set: ResultSet) -> anyhow::Result<()> {
 //!
 //! #[derive(TryFromRow)]
@@ -149,7 +151,7 @@
 //!     // ...
 //! }
 //! # Ok(())
-//! # }
+//! # }}
 //! ```
 //!
 //! ## Representation of values
@@ -163,17 +165,17 @@
 //! use stargate_grpc::Value;
 //!
 //! let bool = Value::boolean(true);
-//! let int = Value::int(1);
+//! let int = Value::bigint(1);
 //! let double = Value::double(1.0);
 //! let string = Value::string("stargate");
-//! let list = Value::list(vec![Value::int(1), Value::int(2), Value::int(3)]);
-//! let map = Value::map(vec![("key1", Value::int(1)), ("key2", Value::int(2))]);
+//! let list = Value::list(vec![Value::bigint(1), Value::bigint(2), Value::bigint(3)]);
+//! let map = Value::map(vec![("key1", Value::bigint(1)), ("key2", Value::bigint(2))]);
 //! ```
 //!
 //! List or maps can hold values of different types:
 //! ```rust
 //! # use stargate_grpc::Value;
-//! let heterogeneous_list = vec![Value::int(1), Value::double(3.14)];
+//! let heterogeneous_list = vec![Value::bigint(1), Value::double(3.14)];
 //! ```
 //!
 //! Values can be used in calls to `bind` or `bind_name` used when building queries or batches:
@@ -182,7 +184,7 @@
 //! use stargate_grpc::{Query, Value};
 //! let query = Query::builder()
 //!     .query("SELECT login, emails FROM users WHERE id = :id")
-//!     .bind_name("id", Value::int(1000))
+//!     .bind_name("id", Value::bigint(1000))
 //!     .build();
 //! ```
 //!
@@ -191,7 +193,7 @@
 //! use std::convert::TryInto;
 //! use stargate_grpc::{Row, Value};
 //!
-//! let row = Row { values: vec![Value::int(1), Value::double(3.14)] };
+//! let row = Row { values: vec![Value::bigint(1), Value::double(3.14)] };
 //! ```
 //!
 //! Values can be converted to and from other commonly used Rust types.
@@ -253,7 +255,7 @@
 //! ```
 //!
 //! ### Mapping Rust structs to user defined types
-//! Feature [`stargate-grpc-derive`](stargate_grpc_derive) (enabled by default) allows to
+//! Feature [`stargate-grpc-derive`](../stargate_grpc_derive) allows to
 //! generate conversions between `Value`s and your Rust structs by adding
 //! the `#[derive(IntoValue, TryFromValue)]` attribute on top of a struct definition.
 //!

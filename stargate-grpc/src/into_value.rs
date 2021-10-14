@@ -1,16 +1,16 @@
 //! # Automatic conversions from standard Rust types to `Value`.
 //!
 //! Values can be obtained by calling dedicated factory methods:
-//! ```rust
+//!```rust
 //! # use stargate_grpc::Value;
 //! #
-//! let int_value = Value::int(5);
+//! let int_value = Value::bigint(5);
 //! let double_value = Value::double(3.14);
 //! let string_value = Value::string("foo");
 //! let inet_value = Value::inet(&[127, 0, 0, 1]);
 //! let bytes_value = Value::bytes(vec![0xff, 0xfe, 0x00]);
 //! let list_value = Value::list(vec![1.41, 3.14]);
-//! let heterogeneous = Value::list(vec![Value::int(1), Value::double(3.14)]);
+//! let heterogeneous = Value::list(vec![Value::bigint(1), Value::double(3.14)]);
 //! ```
 //! Values can be also generically created from commonly used Rust types using
 //! standard Rust [`Into`](std::convert::Into) or [`From`](std::convert::From) traits:
@@ -32,50 +32,51 @@
 //!
 //! It is also possible to specify the desired target CQL type by using [`Value::of_type`]
 //! to disambiguate when more than one target types are possible:
-//! ```rust
+//!```rust
 //! # use stargate_grpc::{types, Value};
 //! #
-//! let bytes = Value::of_type(types::List(types::Bytes), vec![vec![0, 1], vec![2, 3]]);
+//! let bytes = Value::of_type(types::List(types::Blob), vec![vec![0, 1], vec![2, 3]]);
 //! let ints = Value::of_type(types::List(types::Varint), vec![vec![0, 1], vec![2, 3]]);
 //! assert_ne!(bytes, ints);
 //! ```
 //! Specifying the desired target type is more type safe and may guard you from
 //! sending the data of a wrong type:
 //! ```ignore
-//! let list_of_strings = Value::of_type(types::List(types::String), vec![10]); // compile time error
+//! let list_of_strings = Value::of_type(types::List(types::Text), vec![10]); // compile time error
 //! ```
 //! ## Standard conversions
-//! | Rust type                     | gRPC type
+//! | Rust type                     | CQL type
 //! |-------------------------------|------------------------------------
-//! | `i8`                          | [`types::Int`]
-//! | `i16`                         | [`types::Int`]
+//! | `i8`                          | [`types::Tinyint`]
+//! | `i16`                         | [`types::Smallint`]
 //! | `i32`                         | [`types::Int`] [`types::Date`]
-//! | `i64`                         | [`types::Int`]
+//! | `i64`                         | [`types::Bigint`]
 //! | `u16`                         | [`types::Int`]
-//! | `u32`                         | [`types::Int`]
+//! | `u32`                         | [`types::Bigint`]
 //! | `u64`                         | [`types::Time`]
 //! | `f32`                         | [`types::Float`]
 //! | `f64`                         | [`types::Double`]
 //! | `bool`                        | [`types::Boolean`]
-//! | `String`                      | [`types::String`]
-//! | `&str`                        | [`types::String`]
-//! | `std::time::SystemTime`       | [`types::Int`]
-//! | `Vec<u8>`                     | [`types::Bytes`, `types::Varint`]
+//! | `String`                      | [`types::Text`]
+//! | `&str`                        | [`types::Text`]
+//! | `std::time::SystemTime`       | [`types::Timestamp`]
+//! | `Vec<u8>`                     | [`types::Blob`], [`types::Varint`]
 //! | `Vec<T>`                      | [`types::List`]
+//! | `(T1, T2, ...)`               | [`types::List`]
+//! | `HashSet<T>`                  | [`types::Set`]
+//! | `BTreeSet<T>`                 | [`types::Set`]
 //! | `Vec<(K, V)>`                 | [`types::Map`]
 //! | `Vec<KeyValue>`               | [`types::Map`]
 //! | `HashMap<K, V>`               | [`types::Map`]
 //! | `BTreeMap<K, V>`              | [`types::Map`]
-//! | `(T1, T2, ...)`               | [`types::List`]
-//! | &[u8; 4]                      | [`types::Inet`]
-//! | &[u8; 16]                     | [`types::Inet`]
-//! | &[u8; 16]                     | [`types::Uuid`]
+//! | &[u8; 4], [u8; 4]             | [`types::Inet`]
+//! | &[u8; 16], [u8; 16]           | [`types::Inet`]
+//! | &[u8; 16], [u8; 16]           | [`types::Uuid`]
 //! | [`proto::Decimal`]            | [`types::Decimal`]
 //! | [`proto::Inet`]               | [`types::Inet`]
 //! | [`proto::UdtValue`]           | [`types::Udt`]
 //! | [`proto::Uuid`]               | [`types::Uuid`]
 //! | [`proto::Varint`]             | [`types::Varint`]
-//!
 //!
 //! ## Optional conversions
 //!
@@ -84,7 +85,7 @@
 //! | Rust type                   | gRPC type
 //! |-----------------------------|------------------------------------
 //! | `chrono::Date<T>`           | [`types::Date`]
-//! | `chrono::DateTime<T>`       | [`types::Int`]
+//! | `chrono::DateTime<T>`       | [`types::Timestamp`]
 //! | `uuid::Uuid`                | [`types::Uuid`]
 //!
 //!
@@ -99,7 +100,7 @@
 //! However, the distinction between a map and a list is needed in order to allow you to
 //! specify the type of map's keys separately from the type of the values.
 //!
-//! ```rust
+//!```rust
 //! use std::collections::HashMap;
 //! use stargate_grpc::{types, Value};
 //!
@@ -107,23 +108,23 @@
 //! dates.insert("start", 18740);   // days since Unix epoch
 //! dates.insert("end", 18747);
 //!
-//! let date_map = Value::of_type(types::Map(types::String, types::Date), dates);
+//! let date_map = Value::of_type(types::Map(types::Text, types::Date), dates);
 //! ```
 //!
 //! By specifying a target type as `types::Map` you're also able to convert a vector of pairs
 //! into a collection representing a map, although the default target type for converting a
 //! `Vec<T>` is a list:
 //!
-//! ```rust
+//!```rust
 //! use stargate_grpc::{types, Value};
 //!
 //! let collection1 = vec![("key1", 1), ("key2", 2)];
 //! let collection2 = collection1.clone();
 //!
 //! // Maps to map<string, bigint> on the C* side:
-//! let value_as_map = Value::of_type(types::Map(types::String, types::Int), collection1);
+//! let value_as_map = Value::of_type(types::Map(types::Text, types::Bigint), collection1);
 //! // Maps to list<tuple<string, bigint>> on the C* side:
-//! let value_as_list = Value::of_type(types::List((types::String, types::Int)), collection2);
+//! let value_as_list = Value::of_type(types::List((types::Text, types::Bigint)), collection2);
 //!
 //! assert_ne!(value_as_map, value_as_list)
 //! ```
@@ -171,14 +172,14 @@
 //!
 //! struct Login(String);
 //!
-//! impl IntoValue<types::String> for Login {
+//! impl IntoValue<types::Text> for Login {
 //!    fn into_value(self) -> Value {
 //!        Value::raw_string(self.0)
 //!    }
 //! }
 //!
 //! impl DefaultCqlType for Login {
-//!    type C = types::String;
+//!    type C = types::Text;
 //! }
 //!
 //! let login = Login("login".to_string());
@@ -212,13 +213,13 @@ use crate::*;
 ///
 /// assert_eq!(Value::from(true), Value::boolean(true));
 /// assert_eq!(Value::from(1.0), Value::double(1.0));
-/// assert_eq!(Value::from(vec![1, 2]), Value::list(vec![Value::int(1), Value::int(2)]));
+/// assert_eq!(Value::from(vec![1, 2]), Value::list(vec![Value::bigint(1), Value::bigint(2)]));
 ///
 /// let x: Value = 100.into();
-/// assert_eq!(x, Value::int(100));
+/// assert_eq!(x, Value::bigint(100));
 ///
 /// let some: Value = Some(100).into();
-/// assert_eq!(some, Value::int(100));
+/// assert_eq!(some, Value::bigint(100));
 /// let none: Value = (None as Option<i32>).into();
 /// assert_eq!(none, Value::null());
 ///
@@ -233,11 +234,11 @@ impl DefaultCqlType for bool {
 }
 
 impl DefaultCqlType for i8 {
-    type C = types::Int;
+    type C = types::Tinyint;
 }
 
 impl DefaultCqlType for i16 {
-    type C = types::Int;
+    type C = types::Smallint;
 }
 
 impl DefaultCqlType for i32 {
@@ -245,7 +246,7 @@ impl DefaultCqlType for i32 {
 }
 
 impl DefaultCqlType for i64 {
-    type C = types::Int;
+    type C = types::Bigint;
 }
 
 impl DefaultCqlType for u16 {
@@ -253,7 +254,7 @@ impl DefaultCqlType for u16 {
 }
 
 impl DefaultCqlType for u32 {
-    type C = types::Int;
+    type C = types::Bigint;
 }
 
 impl DefaultCqlType for f32 {
@@ -265,15 +266,15 @@ impl DefaultCqlType for f64 {
 }
 
 impl DefaultCqlType for String {
-    type C = types::String;
+    type C = types::Text;
 }
 
 impl DefaultCqlType for &str {
-    type C = types::String;
+    type C = types::Text;
 }
 
 impl DefaultCqlType for Vec<u8> {
-    type C = types::Bytes;
+    type C = types::Blob;
 }
 
 impl DefaultCqlType for proto::Decimal {
@@ -530,8 +531,8 @@ impl Value {
     ///
     /// let integers = Value::of_type(List(Int), vec![1, 2]);
     /// assert_eq!(integers, Value::list(vec![
-    ///     Value::int(1),
-    ///     Value::int(2)
+    ///     Value::bigint(1),
+    ///     Value::bigint(2)
     /// ]));
     ///
     /// let times_since_midnight = Value::of_type(List(Time), vec![1000, 2000]);
@@ -557,14 +558,14 @@ impl Value {
     ///
     /// // Create a map that holds values of different types
     /// let mut map = BTreeMap::new();
-    /// map.insert(1, Value::int(1));
+    /// map.insert(1, Value::bigint(1));
     /// map.insert(2, Value::string("foo"));
     ///
     /// // Specify the keys should be converted to time:
     /// let value = Value::of_type(Map(Time, Any), map);
     ///
     /// assert_eq!(value, Value::map(vec![
-    ///     (Value::time(1), Value::int(1)),
+    ///     (Value::time(1), Value::bigint(1)),
     ///     (Value::time(2), Value::string("foo")),
     /// ]));
     /// ```
@@ -595,13 +596,18 @@ impl Value {
         value.into_value()
     }
 
-    /// Constructs a CQL `tinyint`, `smallint`, `int`, `bigint`, `counter` or `timestamp` value.
-    pub fn int(value: impl IntoValue<types::Int>) -> Value {
+    /// Constructs a CQL `bigint` value.
+    pub fn bigint(value: impl IntoValue<types::Bigint>) -> Value {
         value.into_value()
     }
 
-    /// Constructs a CQL `float` value.
-    pub fn float(value: impl IntoValue<types::Float>) -> Value {
+    /// Constructs a CQL `counter` value.
+    pub fn counter(value: impl IntoValue<types::Counter>) -> Value {
+        value.into_value()
+    }
+
+    /// Constructs a CQL `date` value.
+    pub fn date(value: impl IntoValue<types::Date>) -> Value {
         value.into_value()
     }
 
@@ -610,8 +616,18 @@ impl Value {
         value.into_value()
     }
 
-    /// Constructs a CQL `date` value.
-    pub fn date(value: impl IntoValue<types::Date>) -> Value {
+    /// Constructs a CQL `float` value.
+    pub fn float(value: impl IntoValue<types::Float>) -> Value {
+        value.into_value()
+    }
+
+    /// Constructs a CQL `float` value.
+    pub fn int(value: impl IntoValue<types::Int>) -> Value {
+        value.into_value()
+    }
+
+    /// Constructs a CQL `float` value.
+    pub fn smallint(value: impl IntoValue<types::Smallint>) -> Value {
         value.into_value()
     }
 
@@ -636,7 +652,7 @@ impl Value {
     }
 
     /// Constructs a CQL `blob` or `custom` value.
-    pub fn bytes(value: impl IntoValue<types::Bytes>) -> Value {
+    pub fn bytes(value: impl IntoValue<types::Blob>) -> Value {
         value.into_value()
     }
 
@@ -651,7 +667,7 @@ impl Value {
     }
 
     /// Constructs a CQL `ascii`, `varchar` or `text` value.
-    pub fn string(value: impl IntoValue<types::String>) -> Value {
+    pub fn string(value: impl IntoValue<types::Text>) -> Value {
         value.into_value()
     }
 
@@ -666,7 +682,7 @@ impl Value {
     ///
     /// assert_eq!(
     ///     Value::list(vec![1, 2]),
-    ///     Value::list(vec![Value::int(1), Value::int(2)])
+    ///     Value::list(vec![Value::bigint(1), Value::bigint(2)])
     /// );
     /// ```
     /// See also [`Value::list_of`].
@@ -745,8 +761,8 @@ impl Value {
     /// assert_eq!(
     ///     Value::map(map),
     ///     Value::map(vec![
-    ///         (Value::int(1), Value::string("foo")),
-    ///         (Value::int(2), Value::string("bar"))
+    ///         (Value::bigint(1), Value::string("foo")),
+    ///         (Value::bigint(2), Value::string("bar"))
     ///     ])
     /// );
     /// ```
@@ -785,10 +801,10 @@ impl Value {
     /// map.insert(2, &[127, 0, 0, 2]);
     ///
     /// assert_eq!(
-    ///     Value::map_of(types::Int, types::Inet, map),
+    ///     Value::map_of(types::Bigint, types::Inet, map),
     ///     Value::map(vec![
-    ///         (Value::int(1), Value::inet(&[127, 0, 0, 1])),
-    ///         (Value::int(2), Value::inet(&[127, 0, 0, 2]))
+    ///         (Value::bigint(1), Value::inet(&[127, 0, 0, 1])),
+    ///         (Value::bigint(2), Value::inet(&[127, 0, 0, 2]))
     ///     ])
     /// );
     /// ```
@@ -880,15 +896,28 @@ macro_rules! gen_conversion {
 
 gen_conversion!(bool => types::Boolean; x => Value::raw_boolean(x));
 
-gen_conversion!(i64 => types::Int; x => Value::raw_int(x));
+gen_conversion!(i64 => types::Bigint; x => Value::raw_int(x));
+gen_conversion!(i32 => types::Bigint; x => Value::raw_int(x as i64));
+gen_conversion!(i16 => types::Bigint; x => Value::raw_int(x as i64));
+gen_conversion!(i8 => types::Bigint; x => Value::raw_int(x as i64));
+
 gen_conversion!(i32 => types::Int; x => Value::raw_int(x as i64));
 gen_conversion!(i16 => types::Int; x => Value::raw_int(x as i64));
 gen_conversion!(i8 => types::Int; x => Value::raw_int(x as i64));
 
-//there is no u64 to Int conversion because it doesn't fit fully in the target range
-gen_conversion!(u32 => types::Int; x => Value::raw_int(x as i64));
+gen_conversion!(i16 => types::Smallint; x => Value::raw_int(x as i64));
+gen_conversion!(i8 => types::Smallint; x => Value::raw_int(x as i64));
+
+gen_conversion!(i8 => types::Tinyint; x => Value::raw_int(x as i64));
+
+gen_conversion!(u32 => types::Bigint; x => Value::raw_int(x as i64));
+gen_conversion!(u16 => types::Bigint; x => Value::raw_int(x as i64));
+gen_conversion!(u8 => types::Bigint; x => Value::raw_int(x as i64));
+
 gen_conversion!(u16 => types::Int; x => Value::raw_int(x as i64));
 gen_conversion!(u8 => types::Int; x => Value::raw_int(x as i64));
+
+gen_conversion!(u8 => types::Smallint; x => Value::raw_int(x as i64));
 
 gen_conversion!(i32 => types::Date; x => Value::raw_date((x as i64 - i32::MIN as i64) as u32));
 gen_conversion!(u64 => types::Time; x => Value::raw_time(x));
@@ -897,10 +926,10 @@ gen_conversion!(i64 => types::Timestamp; x => Value::raw_int(x));
 gen_conversion!(f32 => types::Float; x => Value::raw_float(x));
 gen_conversion!(f64 => types::Double; x => Value::raw_double(x));
 
-gen_conversion!(String => types::String; x => Value::raw_string(x));
-gen_conversion!(&str => types::String; x => Value::raw_string(x.to_string()));
+gen_conversion!(String => types::Text; x => Value::raw_string(x));
+gen_conversion!(&str => types::Text; x => Value::raw_string(x.to_string()));
 
-gen_conversion!(Vec<u8> => types::Bytes; x => Value::raw_bytes(x));
+gen_conversion!(Vec<u8> => types::Blob; x => Value::raw_bytes(x));
 gen_conversion!(Vec<u8> => types::Varint; x => Value::raw_varint(x));
 
 gen_conversion!([u8; 4] => types::Inet; x => Value::raw_inet(x.to_vec()));
@@ -1147,31 +1176,31 @@ mod test {
 
     use proto::value::Inner;
 
-    use crate::types::{Any, Date, Int, List, Map, Time};
+    use crate::types::{Any, Bigint, Date, List, Map, Time};
     use crate::*;
 
     #[test]
     fn convert_value_into_value() {
-        let v: Value = Value::int(1).into();
-        assert_eq!(v, Value::int(1));
+        let v: Value = Value::bigint(1).into();
+        assert_eq!(v, Value::bigint(1));
     }
 
     #[test]
     fn convert_i64_into_any_using_of_type() {
         let v: Value = Value::of_type(Any, 1);
-        assert_eq!(v, Value::int(1));
+        assert_eq!(v, Value::bigint(1));
     }
 
     #[test]
     fn convert_value_into_any_using_of_type() {
-        let v: Value = Value::of_type(Any, Value::int(1));
-        assert_eq!(v, Value::int(1))
+        let v: Value = Value::of_type(Any, Value::bigint(1));
+        assert_eq!(v, Value::bigint(1))
     }
 
     #[test]
     fn convert_i64_into_value() {
         let v: Value = 100.into();
-        assert_eq!(v, Value::int(100));
+        assert_eq!(v, Value::bigint(100));
     }
 
     #[test]
@@ -1249,9 +1278,9 @@ mod test {
         let time = SystemTime::now();
         let unix_time = time.duration_since(UNIX_EPOCH).unwrap().as_millis() as i64;
         let value1 = Value::from(time);
-        assert_eq!(value1, Value::int(unix_time));
+        assert_eq!(value1, Value::bigint(unix_time));
         let value2 = Value::timestamp(time);
-        assert_eq!(value2, Value::int(unix_time));
+        assert_eq!(value2, Value::bigint(unix_time));
     }
 
     #[test]
@@ -1300,21 +1329,21 @@ mod test {
     fn convert_tuple_into_default_value() {
         let tuple = (1, "foo");
         let v = Value::from(tuple);
-        assert_eq!(v, Value::list(vec![Value::int(1), Value::string("foo")]))
+        assert_eq!(v, Value::list(vec![Value::bigint(1), Value::string("foo")]))
     }
 
     #[test]
     fn convert_tuple_into_list_value_using_of_type() {
         let tuple = (1, "foo");
         let v = Value::of_type(List(Any), tuple);
-        assert_eq!(v, Value::list(vec![Value::int(1), Value::string("foo")]))
+        assert_eq!(v, Value::list(vec![Value::bigint(1), Value::string("foo")]))
     }
 
     #[test]
     fn convert_tuple_into_typed_value() {
         let tuple = (1, 100);
-        let v = Value::of_type((Int, Time), tuple);
-        assert_eq!(v, Value::list(vec![Value::int(1), Value::time(100)]))
+        let v = Value::of_type((Bigint, Time), tuple);
+        assert_eq!(v, Value::list(vec![Value::bigint(1), Value::time(100)]))
     }
 
     #[test]
@@ -1331,7 +1360,7 @@ mod test {
     fn convert_option_into_value() {
         let some: Option<i64> = Some(123);
         let some_value: Value = some.into();
-        assert_eq!(Value::int(123), some_value);
+        assert_eq!(Value::bigint(123), some_value);
 
         let none: Option<i64> = None;
         let none_value: Value = none.into();
@@ -1341,7 +1370,7 @@ mod test {
     #[test]
     fn convert_option_into_any_using_of_type() {
         let v: Value = Value::of_type(Any, Some(1));
-        assert_eq!(v, Value::int(1));
+        assert_eq!(v, Value::bigint(1));
 
         let v: Value = Value::of_type(Any, None as Option<i32>);
         assert_eq!(v, Value::null());
@@ -1352,14 +1381,14 @@ mod test {
         let list = vec![1, 2];
         let v1 = Value::from(list.clone());
         let v2 = Value::list(list.clone());
-        assert_eq!(v1, Value::list(vec![Value::int(1), Value::int(2)]));
+        assert_eq!(v1, Value::list(vec![Value::bigint(1), Value::bigint(2)]));
         assert_eq!(v1, v2);
     }
 
     #[test]
     fn convert_nested_vec_i64_into_value() {
         let list = vec![vec![1, 2]];
-        let expected = Value::list(vec![Value::list(vec![Value::int(1), Value::int(2)])]);
+        let expected = Value::list(vec![Value::list(vec![Value::bigint(1), Value::bigint(2)])]);
         let converted = Value::from(list);
         assert_eq!(converted, expected);
     }
@@ -1381,8 +1410,8 @@ mod test {
     #[test]
     fn convert_vec_of_pairs_into_map_value() {
         let expected = Value::map(vec![
-            (Value::int(1), Value::string("foo")),
-            (Value::int(2), Value::string("bar")),
+            (Value::bigint(1), Value::string("foo")),
+            (Value::bigint(2), Value::string("bar")),
         ]);
 
         let list1 = vec![KeyValue(1, "foo"), KeyValue(2, "bar")];
@@ -1390,7 +1419,7 @@ mod test {
 
         let list2 = vec![(1, "foo"), (2, "bar")];
         assert_eq!(
-            Value::of_type(Map(Int, types::String), list2),
+            Value::of_type(Map(types::Bigint, types::Text), list2),
             expected.clone()
         );
     }
@@ -1402,7 +1431,7 @@ mod test {
         set.insert(2);
         set.insert(3);
 
-        let elements = set.iter().map(|e| Value::int(*e)).collect_vec();
+        let elements = set.iter().map(|e| Value::bigint(*e)).collect_vec();
         assert_eq!(Value::from(set), Value::set(elements));
     }
 
@@ -1413,7 +1442,7 @@ mod test {
         set.insert(2);
         set.insert(3);
 
-        let elements = set.iter().map(|e| Value::int(*e)).collect_vec();
+        let elements = set.iter().map(|e| Value::bigint(*e)).collect_vec();
         assert_eq!(Value::from(set), Value::set(elements));
     }
 
@@ -1426,8 +1455,8 @@ mod test {
         assert_eq!(
             Value::from(map),
             Value::map(vec![
-                (Value::int(1), Value::string("foo")),
-                (Value::int(2), Value::string("bar")),
+                (Value::bigint(1), Value::string("foo")),
+                (Value::bigint(2), Value::string("bar")),
             ])
         );
     }
@@ -1439,14 +1468,14 @@ mod test {
 
         assert_eq!(
             Value::from(map),
-            Value::map(vec![(Value::int(1), Value::string("foo"))])
+            Value::map(vec![(Value::bigint(1), Value::string("foo"))])
         );
     }
 
     #[test]
     fn convert_hash_map_to_udt_value() {
         let mut map = HashMap::new();
-        map.insert("field1", Value::int(1));
+        map.insert("field1", Value::bigint(1));
         map.insert("field2", Value::string("bar"));
         let v = Value::udt(map);
         match v.inner {
@@ -1458,7 +1487,7 @@ mod test {
     #[test]
     fn convert_raw_udt_value_to_value() {
         let mut map = HashMap::new();
-        map.insert("field1".to_string(), Value::int(1));
+        map.insert("field1".to_string(), Value::bigint(1));
         map.insert("field2".to_string(), Value::string("bar"));
         let udt_value = proto::UdtValue { fields: map };
         let v = Value::from(udt_value);

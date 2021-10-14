@@ -84,7 +84,7 @@ impl QueryBuilder {
     ///
     /// let query2 = Query::builder()
     ///     .query(cql)
-    ///     .bind(vec![Value::int(2021), Value::string("October")])
+    ///     .bind(vec![Value::bigint(2021), Value::string("October")])
     ///     .build();
     ///
     /// assert_eq!(query1.values, query2.values);

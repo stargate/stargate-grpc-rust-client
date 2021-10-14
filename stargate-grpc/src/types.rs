@@ -9,20 +9,26 @@
 //! ```
 //! use stargate_grpc::types;
 //!
-//! let int_type = types::Int;
-//! let list_of_ints = types::List(types::Int);
-//! let list_of_tuples = types::List((types::Int, types::String));
+//! let int_type = types::Bigint;
+//! let list_of_ints = types::List(types::Bigint);
+//! let list_of_tuples = types::List((types::Bigint, types::Text));
 //! let map_from_uuid_to_user_type = types::Map(types::Uuid, types::Udt);
 //! ```
 
 /// Must be implemented by all types except Any.
 pub trait ConcreteType {}
 
+pub struct Bigint;
+impl ConcreteType for Bigint {}
+
 pub struct Boolean;
 impl ConcreteType for Boolean {}
 
-pub struct Bytes;
-impl ConcreteType for Bytes {}
+pub struct Blob;
+impl ConcreteType for Blob {}
+
+pub struct Counter;
+impl ConcreteType for Counter {}
 
 pub struct Date;
 impl ConcreteType for Date {}
@@ -42,8 +48,11 @@ impl ConcreteType for Inet {}
 pub struct Int;
 impl ConcreteType for Int {}
 
-pub struct String;
-impl ConcreteType for String {}
+pub struct Smallint;
+impl ConcreteType for Smallint {}
+
+pub struct Text;
+impl ConcreteType for Text {}
 
 pub struct Time;
 impl ConcreteType for Time {}
@@ -51,11 +60,17 @@ impl ConcreteType for Time {}
 pub struct Timestamp;
 impl ConcreteType for Timestamp {}
 
+pub struct Tinyint;
+impl ConcreteType for Tinyint {}
+
 pub struct Udt;
 impl ConcreteType for Udt {}
 
 pub struct Uuid;
 impl ConcreteType for Uuid {}
+
+pub struct Varchar;
+impl ConcreteType for Varchar {}
 
 pub struct Varint;
 impl ConcreteType for Varint {}

@@ -10,10 +10,10 @@
 //! # use stargate_grpc::error::ConversionError;
 //! use stargate_grpc::Value;
 //!
-//! let int: i64 = Value::int(10).try_into()?;
+//! let int: i64 = Value::bigint(10).try_into()?;
 //! let string: String = Value::string("foo").try_into()?;
-//! let list: Vec<i64> = Value::list(vec![Value::int(1), Value::int(2)]).try_into()?;
-//! let (a, b): (i64, f64) = Value::list(vec![Value::int(1), Value::double(3.14)]).try_into()?;
+//! let list: Vec<i64> = Value::list(vec![Value::bigint(1), Value::bigint(2)]).try_into()?;
+//! let (a, b): (i64, f64) = Value::list(vec![Value::bigint(1), Value::double(3.14)]).try_into()?;
 //!
 //! # Ok::<(), ConversionError>(())
 //! ```
@@ -25,7 +25,7 @@
 //! `Boolean`     | `bool`
 //! `Bytes`       | `Vec<u8>`
 //! `Inet`        | [`proto::Inet`]
-//! `Int`         | `i64`,
+//! `Int`         | `i64`, `i32`, `i16`, `i8`, `u32`, `u16`
 //! `Double`      | `f64`
 //! `Date`        | `i32`, `chrono::Date<Local>`, `chrono::Date<Utc>`
 //! `Decimal`     | [`proto::Decimal`]
@@ -65,7 +65,7 @@
 //! # use stargate_grpc::Value;
 //! # #[cfg(feature = "chrono")] {
 //! use chrono::{DateTime, Utc};
-//! let timestamp: DateTime<Utc> = Value::int(1633478400021_i64).try_into()?;
+//! let timestamp: DateTime<Utc> = Value::bigint(1633478400021_i64).try_into()?;
 //! assert_eq!(timestamp.to_rfc2822(), "Wed, 06 Oct 2021 00:00:00 +0000");
 //! # }
 //! # Ok::<(), ConversionError>(())
@@ -116,6 +116,7 @@ use std::iter::FromIterator;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use itertools::Itertools;
+use num::FromPrimitive;
 
 use crate::error::ConversionError;
 use crate::proto::{value, Row, Value};
@@ -190,12 +191,12 @@ macro_rules! gen_std_conversion_generic {
 
 /// Generates a `TryFromValue` for given concrete Rust type.
 macro_rules! gen_conversion {
-    ($T:ty; $( $from:pat_param => $to:expr ),+) => {
+    ($T:ty; $( $from:pat => $to:expr ),+) => {
 
         impl TryFromValue for $T {
             fn try_from(value: Value) -> Result<Self, ConversionError> {
                 match value.inner {
-                    $(Some($from) => $to)+,
+                    $(Some($from) => $to),+,
                     other => Err(ConversionError::incompatible::<_, Self>(other)),
                 }
             }
@@ -206,10 +207,26 @@ macro_rules! gen_conversion {
     }
 }
 
+fn safe_convert_primitive<T: FromPrimitive>(x: i64) -> Result<T, ConversionError> {
+    T::from_i64(x).ok_or_else(|| ConversionError::out_of_range::<_, T>(x))
+}
+
 gen_conversion!(bool; value::Inner::Boolean(x) => Ok(x));
+
 gen_conversion!(i64; value::Inner::Int(x) => Ok(x));
-gen_conversion!(i32; value::Inner::Date(x) => Ok((x as i64 + i32::MIN as i64) as i32));
-gen_conversion!(u64; value::Inner::Time(x) => Ok(x));
+gen_conversion!(i32;
+    value::Inner::Int(x) => safe_convert_primitive(x),
+    value::Inner::Date(x) => Ok((x as i64 + i32::MIN as i64) as i32));
+gen_conversion!(i16; value::Inner::Int(x) => safe_convert_primitive(x));
+gen_conversion!(i8; value::Inner::Int(x) => safe_convert_primitive(x));
+
+gen_conversion!(u64;
+    value::Inner::Int(x) => safe_convert_primitive(x),
+    value::Inner::Time(x) => Ok(x)
+);
+gen_conversion!(u32; value::Inner::Int(x) => safe_convert_primitive(x));
+gen_conversion!(u16; value::Inner::Int(x) => safe_convert_primitive(x));
+
 gen_conversion!(f32; value::Inner::Float(x) => Ok(x));
 gen_conversion!(f64; value::Inner::Double(x) => Ok(x));
 gen_conversion!(String; value::Inner::String(x) => Ok(x));
@@ -480,9 +497,45 @@ mod test {
 
     #[test]
     fn convert_value_to_i64() {
-        let v = Value::int(123);
+        let v = Value::raw_int(123);
         let int: i64 = v.try_into().unwrap();
         assert_eq!(int, 123)
+    }
+
+    #[test]
+    fn convert_value_to_i32() {
+        let v = Value::raw_int(123);
+        let int: i32 = v.try_into().unwrap();
+        assert_eq!(int, 123);
+
+        // check range overflow
+        let v = Value::raw_int(i32::MAX as i64 + 1);
+        let int: Result<i32, ConversionError> = v.try_into();
+        assert!(int.is_err())
+    }
+
+    #[test]
+    fn convert_value_to_i16() {
+        let v = Value::int(123);
+        let int: i16 = v.try_into().unwrap();
+        assert_eq!(int, 123);
+
+        // check range overflow
+        let v = Value::raw_int(i16::MAX as i64 + 1);
+        let int: Result<i16, ConversionError> = v.try_into();
+        assert!(int.is_err())
+    }
+
+    #[test]
+    fn convert_value_to_i8() {
+        let v = Value::int(123);
+        let int: i8 = v.try_into().unwrap();
+        assert_eq!(int, 123);
+
+        // check range overflow
+        let v = Value::raw_int(i8::MAX as i64 + 1);
+        let int: Result<i8, ConversionError> = v.try_into();
+        assert!(int.is_err())
     }
 
     #[test]
@@ -562,7 +615,7 @@ mod test {
 
     #[test]
     fn convert_value_to_system_time() {
-        let v = Value::int(10000);
+        let v = Value::bigint(10000);
         let time: SystemTime = v.try_into().unwrap();
         assert_eq!(time.duration_since(UNIX_EPOCH).unwrap().as_millis(), 10000);
     }
@@ -570,7 +623,7 @@ mod test {
     #[test]
     #[cfg(feature = "chrono")]
     fn convert_value_to_chrono_date_time() {
-        let v = Value::int(10000);
+        let v = Value::bigint(10000);
         let time: chrono::DateTime<chrono::Utc> = v.try_into().unwrap();
         assert_eq!(time.timestamp_millis(), 10000);
     }
@@ -590,7 +643,7 @@ mod test {
 
     #[test]
     fn convert_value_to_option() {
-        let some = Value::int(123);
+        let some = Value::bigint(123);
         let none = Value::null();
 
         let some_int: Option<i64> = some.try_into().unwrap();
@@ -602,8 +655,8 @@ mod test {
 
     #[test]
     fn convert_value_to_heterogeneous_vec() {
-        let v1 = Value::int(1);
-        let v2 = Value::int(2);
+        let v1 = Value::bigint(1);
+        let v2 = Value::bigint(2);
         let v = Value::list(vec![v1.clone(), v2.clone()]);
 
         let vec: Vec<Value> = v.try_into().unwrap();
@@ -612,8 +665,8 @@ mod test {
 
     #[test]
     fn convert_value_to_homogenous_vec() {
-        let v1 = Value::int(1);
-        let v2 = Value::int(2);
+        let v1 = Value::bigint(1);
+        let v2 = Value::bigint(2);
         let v = Value::list(vec![v1, v2]);
 
         let vec: Vec<i64> = v.try_into().unwrap();
@@ -622,8 +675,8 @@ mod test {
 
     #[test]
     fn convert_value_to_hash_set() {
-        let v1 = Value::int(1);
-        let v2 = Value::int(2);
+        let v1 = Value::bigint(1);
+        let v2 = Value::bigint(2);
         let v = Value::set(vec![v1, v2]);
 
         let set: HashSet<i64> = v.try_into().unwrap();
@@ -632,8 +685,8 @@ mod test {
 
     #[test]
     fn convert_value_to_btree_set() {
-        let v1 = Value::int(1);
-        let v2 = Value::int(2);
+        let v1 = Value::bigint(1);
+        let v2 = Value::bigint(2);
         let v = Value::set(vec![v1, v2]);
 
         let set: BTreeSet<i64> = v.try_into().unwrap();
@@ -642,8 +695,8 @@ mod test {
 
     #[test]
     fn convert_value_to_vec_of_key_value() {
-        let v1 = Value::int(1);
-        let v2 = Value::int(2);
+        let v1 = Value::bigint(1);
+        let v2 = Value::bigint(2);
         let v = Value::list(vec![v1, v2]);
         let vec: Vec<KeyValue<i64, i64>> = v.try_into().unwrap();
         assert_eq!(vec, vec![KeyValue(1, 2)]);
@@ -651,7 +704,7 @@ mod test {
 
     #[test]
     fn convert_value_to_hash_map() {
-        let v1 = Value::int(1);
+        let v1 = Value::bigint(1);
         let v2 = Value::string("foo".to_string());
         let v = Value::list(vec![v1, v2]);
         let map: HashMap<i64, String> = v.try_into().unwrap();
@@ -660,7 +713,7 @@ mod test {
 
     #[test]
     fn convert_value_to_btree_map() {
-        let v1 = Value::int(1);
+        let v1 = Value::bigint(1);
         let v2 = Value::string("foo".to_string());
         let v = Value::list(vec![v1, v2]);
         let map: BTreeMap<i64, String> = v.try_into().unwrap();
@@ -670,8 +723,8 @@ mod test {
     #[test]
     fn convert_value_to_nested_collections() {
         let key = Value::string("foo".to_string());
-        let v1 = Value::int(1);
-        let v2 = Value::int(2);
+        let v1 = Value::bigint(1);
+        let v2 = Value::bigint(2);
         let list = Value::list(vec![v1, v2]);
         let v = Value::list(vec![key, list]);
 
@@ -681,7 +734,7 @@ mod test {
 
     #[test]
     fn convert_value_to_tuples() {
-        let v1 = Value::int(1);
+        let v1 = Value::bigint(1);
         let v2 = Value::float(2.5);
         let v = Value::list(vec![v1, v2]);
         let (a, b): (i64, f32) = v.try_into().unwrap();
@@ -691,8 +744,8 @@ mod test {
 
     #[test]
     fn convert_value_to_triples() {
-        let v1 = Value::int(1);
-        let v2 = Value::int(2);
+        let v1 = Value::bigint(1);
+        let v2 = Value::bigint(2);
         let v3 = Value::float(2.5);
         let v = Value::list(vec![v1, v2, v3]);
 
@@ -704,13 +757,13 @@ mod test {
 
     #[test]
     fn unexpected_type() {
-        let v = Value::int(123);
+        let v = Value::bigint(123);
         assert!(v.try_into::<String>().is_err());
     }
 
     #[test]
     fn unexpected_tuple_size() {
-        let v1 = Value::int(1);
+        let v1 = Value::bigint(1);
         let v2 = Value::float(2.5);
         let v = Value::list(vec![v1, v2]);
         assert!(v.try_into::<(i64, f32, f32, f32)>().is_err());
@@ -722,13 +775,13 @@ mod test {
             value.try_into().unwrap_or(-1)
         }
 
-        let v1 = Value::int(1);
+        let v1 = Value::bigint(1);
         assert_eq!(1, into_i64(v1));
     }
 
     #[test]
     fn convert_row_to_i64() {
-        let values = vec![Value::int(1)];
+        let values = vec![Value::bigint(1)];
         let mut row = Row { values };
         let int: i64 = row.try_take(0).unwrap();
         assert_eq!(int, 1);
@@ -744,7 +797,7 @@ mod test {
 
     #[test]
     fn convert_row_to_tuple() {
-        let values = vec![Value::int(1), Value::double(2.0), Value::string("foo")];
+        let values = vec![Value::bigint(1), Value::double(2.0), Value::string("foo")];
         let row = Row { values };
         let (a, b, c): (i64, f64, String) = row.try_into().unwrap();
         assert_eq!(a, 1);
@@ -754,7 +807,7 @@ mod test {
 
     #[test]
     fn convert_single_item_of_a_row() {
-        let values = vec![Value::int(1), Value::double(2.0), Value::string("foo")];
+        let values = vec![Value::bigint(1), Value::double(2.0), Value::string("foo")];
         let mut row = Row { values };
         let a: i64 = row.try_take(0).unwrap();
         let b: f64 = row.try_take(1).unwrap();
@@ -766,7 +819,7 @@ mod test {
 
     #[test]
     fn convert_copy_of_single_item_of_a_row() {
-        let values = vec![Value::int(1), Value::double(2.0), Value::string("foo")];
+        let values = vec![Value::bigint(1), Value::double(2.0), Value::string("foo")];
         let row = Row { values };
         let a: i64 = row.try_get(0).unwrap();
         let b: f64 = row.try_get(1).unwrap();
