@@ -355,7 +355,7 @@ pub fn derive_try_from_typed_row(tokens: TokenStream) -> TokenStream {
         impl stargate_grpc::result::TryFromRow for #ident {
             fn try_unpack(
                 mut row: stargate_grpc::Row,
-                column_positions: &Vec<usize>
+                column_positions: &[usize]
             ) -> Result<Self, stargate_grpc::error::ConversionError>
             {
                 Ok(#ident {
