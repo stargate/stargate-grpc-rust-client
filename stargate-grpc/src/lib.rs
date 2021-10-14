@@ -18,7 +18,7 @@
 //!
 //! ```toml
 //! [devependencies]
-//! stargate-grpc = "0.1.0"
+//! stargate-grpc = "0.1"
 //! tokio = { version = "1", features = ["full"]}
 //! ```
 //!

@@ -26,19 +26,10 @@ utilities that make them easier to work with.
 Add required dependencies. You'll need at least `stargate-grpc` and an async framework, 
 e.g. [tokio](https://tokio.rs/) or [async-std](https://async.rs/). 
 
-_Caution! Currently this repo is private and the project hasn't been published on crates.io. 
-Until that happens, you need to point Cargo to this repository using the git SSH link._
-
 ```toml
 [dependencies]
-stargate-grpc = { git = "ssh://git@github.com/stargate/stargate-grpc-rust-client.git" }
+stargate-grpc = "0.1"
 tokio = { version = "1", features = ["full"]}
-```
-
-_In order to allow Cargo to authenticate with GitHub keys, put this in `~/.cargo/config`_:
-```toml
-[net]
-git-fetch-with-cli = true
 ```
 
 At this point you should be able to build the project now with `cargo build` and it would fetch and compile 
