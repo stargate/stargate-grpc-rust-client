@@ -36,7 +36,7 @@
 //! `Uuid`        | [`proto::Uuid`], `uuid::Uuid`
 //! `Udt`         | [`proto::UdtValue`]
 //! `Varint`      | [`proto::Varint`]
-//! `Collection`  | `Vec<T>`, `HashMap<K, V>`, `BTreeMap<K, V>`, `(T1, T2, ..., Tn)`
+//! `Collection`  | `Vec<T>`, `HashSet<T>`, `BTreeSet<T>`, `HashMap<K, V>`, `BTreeMap<K, V>`, `(T1, T2, ..., Tn)`
 //!
 //! ## Handling nulls
 //!
@@ -108,10 +108,11 @@
 //! # Ok::<(), ConversionError>(())
 //! ```
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::convert::TryFrom;
 use std::error::Error;
 use std::hash::Hash;
+use std::iter::FromIterator;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use itertools::Itertools;
@@ -255,7 +256,8 @@ gen_conversion!(chrono::DateTime<chrono::Local>; value::Inner::Int(millis) => {
 fn into_naive_date(days: u32) -> Result<chrono::NaiveDate, ConversionError> {
     let days: i32 = (days as i64 + i32::MIN as i64) as i32;
     let err = || ConversionError::out_of_range::<_, chrono::Date<chrono::Local>>(days);
-    if days > i32::MAX - 365 {  // protect from chrono numerical overflow
+    if days > i32::MAX - 365 {
+        // protect from chrono numerical overflow
         return Err(err());
     }
     chrono::NaiveDate::from_num_days_from_ce_opt(days).ok_or_else(err)
@@ -374,20 +376,39 @@ where
     }
 }
 
+fn convert_collection<A: TryFromValue, T: FromIterator<A>>(
+    value: Value,
+) -> Result<T, ConversionError> {
+    match value.inner {
+        Some(value::Inner::Collection(c)) => {
+            Ok(c.elements.into_iter().map(|e| e.try_into()).try_collect()?)
+        }
+        other => Err(ConversionError::incompatible::<_, T>(other)),
+    }
+}
+
 /// Converts a `Value` into a vector, converting all elements to appropriate type `T` if needed.
 /// `T` can be any type that have a supported conversion from `Value`.
 /// It is also allowed that `T == Value` so you can get a heterogeneous collection back.
-impl<T> TryFromValue for Vec<T>
-where
-    T: TryFromValue,
-{
+impl<T: TryFromValue> TryFromValue for Vec<T> {
     fn try_from(value: Value) -> Result<Self, ConversionError> {
-        match value.inner {
-            Some(value::Inner::Collection(c)) => {
-                Ok(c.elements.into_iter().map(|e| e.try_into()).try_collect()?)
-            }
-            other => Err(ConversionError::incompatible::<_, Self>(other)),
-        }
+        convert_collection(value)
+    }
+}
+
+/// Converts a `Value` into a `HashSet`, converting all elements to appropriate type `T` if needed.
+/// `T` can be any type that have a supported conversion from `Value`.
+impl<T: TryFromValue + Eq + Hash> TryFromValue for HashSet<T> {
+    fn try_from(value: Value) -> Result<Self, ConversionError> {
+        convert_collection(value)
+    }
+}
+
+/// Converts a `Value` into a `BTreeSet`, converting all elements to appropriate type `T` if needed.
+/// `T` can be any type that have a supported conversion from `Value`.
+impl<T: TryFromValue + Ord> TryFromValue for BTreeSet<T> {
+    fn try_from(value: Value) -> Result<Self, ConversionError> {
+        convert_collection(value)
     }
 }
 
@@ -597,6 +618,26 @@ mod test {
 
         let vec: Vec<i64> = v.try_into().unwrap();
         assert_eq!(vec, vec![1, 2]);
+    }
+
+    #[test]
+    fn convert_value_to_hash_set() {
+        let v1 = Value::int(1);
+        let v2 = Value::int(2);
+        let v = Value::set(vec![v1, v2]);
+
+        let set: HashSet<i64> = v.try_into().unwrap();
+        assert_eq!(set, HashSet::from_iter(vec![1, 2]));
+    }
+
+    #[test]
+    fn convert_value_to_btree_set() {
+        let v1 = Value::int(1);
+        let v2 = Value::int(2);
+        let v = Value::set(vec![v1, v2]);
+
+        let set: BTreeSet<i64> = v.try_into().unwrap();
+        assert_eq!(set, BTreeSet::from_iter(vec![1, 2]));
     }
 
     #[test]

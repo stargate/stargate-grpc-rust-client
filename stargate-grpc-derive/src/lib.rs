@@ -184,7 +184,7 @@ fn convert_to_values(obj: &syn::Ident, fields: &[UdtField]) -> Vec<TokenStream2>
     fields.iter().map(|f| convert_to_value(obj, f)).collect()
 }
 
-/// Derives the `IntoValue` and `DefaultGrpcType` implementations for a struct.
+/// Derives the `IntoValue` and `DefaultCqlType` implementations for a struct.
 #[proc_macro_derive(IntoValue, attributes(stargate))]
 pub fn derive_into_value(tokens: TokenStream) -> TokenStream {
     let parsed = syn::parse(tokens).unwrap();
@@ -208,7 +208,7 @@ pub fn derive_into_value(tokens: TokenStream) -> TokenStream {
                 stargate_grpc::Value::raw_udt(fields)
             }
         }
-        impl stargate_grpc::into_value::DefaultGrpcType for #udt_type {
+        impl stargate_grpc::into_value::DefaultCqlType for #udt_type {
             type C = stargate_grpc::types::Udt;
         }
     };

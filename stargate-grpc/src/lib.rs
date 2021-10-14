@@ -261,7 +261,7 @@
 
 pub use client::{AuthToken, StargateClient};
 pub use from_value::TryFromValue;
-pub use into_value::{DefaultGrpcType, IntoValue};
+pub use into_value::{DefaultCqlType, IntoValue};
 pub use proto::{Batch, Consistency, Query, ResultSet, Row, Value};
 #[cfg(feature = "stargate-grpc-derive")]
 pub use stargate_grpc_derive::*;

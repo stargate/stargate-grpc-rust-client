@@ -159,14 +159,14 @@
 //! You can make any type convertible to `Value` by implementing the [`IntoValue`] trait.
 //! Use one of `Value::raw_` methods to construct the actual value.
 //!
-//! Provide a [`DefaultGrpcType`] to make the conversion to desired gRPC type be chosen
+//! Provide a [`DefaultCqlType`] to make the conversion to desired gRPC type be chosen
 //! automatically even when the target value type is not known.
 //! If the default type is specified, you'll also get implementations of appropriate
 //! [`std::convert::From`] and [`std::convert::Into`] traits for free.
 //!
 //! For example, let's define such conversion from a custom `Login` struct` that wraps a `String`:
 //!```
-//! use stargate_grpc::into_value::{DefaultGrpcType, IntoValue};
+//! use stargate_grpc::into_value::{DefaultCqlType, IntoValue};
 //! use stargate_grpc::{types, Value};
 //!
 //! struct Login(String);
@@ -177,7 +177,7 @@
 //!    }
 //! }
 //!
-//! impl DefaultGrpcType for Login {
+//! impl DefaultCqlType for Login {
 //!    type C = types::String;
 //! }
 //!
@@ -189,7 +189,7 @@
 //! ```
 //!
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::convert::TryInto;
 use std::hash::Hash;
 use std::time::SystemTime;
@@ -223,134 +223,148 @@ use crate::*;
 /// assert_eq!(none, Value::null());
 ///
 /// ```
-pub trait DefaultGrpcType {
-    /// gRPC type, must be set to one of the types defined in the [`types`](crate::types) module.
+pub trait DefaultCqlType {
+    /// CQL type, must be set to one of the types defined in the [`types`](crate::types) module.
     type C;
 }
 
-impl DefaultGrpcType for bool {
+impl DefaultCqlType for bool {
     type C = types::Boolean;
 }
 
-impl DefaultGrpcType for i8 {
+impl DefaultCqlType for i8 {
     type C = types::Int;
 }
 
-impl DefaultGrpcType for i16 {
+impl DefaultCqlType for i16 {
     type C = types::Int;
 }
 
-impl DefaultGrpcType for i32 {
+impl DefaultCqlType for i32 {
     type C = types::Int;
 }
 
-impl DefaultGrpcType for i64 {
+impl DefaultCqlType for i64 {
     type C = types::Int;
 }
 
-impl DefaultGrpcType for u16 {
+impl DefaultCqlType for u16 {
     type C = types::Int;
 }
 
-impl DefaultGrpcType for u32 {
+impl DefaultCqlType for u32 {
     type C = types::Int;
 }
 
-impl DefaultGrpcType for f32 {
+impl DefaultCqlType for f32 {
     type C = types::Float;
 }
 
-impl DefaultGrpcType for f64 {
+impl DefaultCqlType for f64 {
     type C = types::Double;
 }
 
-impl DefaultGrpcType for String {
+impl DefaultCqlType for String {
     type C = types::String;
 }
 
-impl DefaultGrpcType for &str {
+impl DefaultCqlType for &str {
     type C = types::String;
 }
 
-impl DefaultGrpcType for Vec<u8> {
+impl DefaultCqlType for Vec<u8> {
     type C = types::Bytes;
 }
 
-impl DefaultGrpcType for proto::Decimal {
+impl DefaultCqlType for proto::Decimal {
     type C = types::Decimal;
 }
 
-impl DefaultGrpcType for proto::Inet {
+impl DefaultCqlType for proto::Inet {
     type C = types::Inet;
 }
 
-impl DefaultGrpcType for proto::UdtValue {
+impl DefaultCqlType for proto::UdtValue {
     type C = types::Udt;
 }
 
-impl DefaultGrpcType for proto::Uuid {
+impl DefaultCqlType for proto::Uuid {
     type C = types::Uuid;
 }
 
 #[cfg(feature = "uuid")]
-impl DefaultGrpcType for uuid::Uuid {
+impl DefaultCqlType for uuid::Uuid {
     type C = types::Uuid;
 }
 
-impl DefaultGrpcType for proto::Varint {
+impl DefaultCqlType for proto::Varint {
     type C = types::Varint;
 }
 
-impl DefaultGrpcType for SystemTime {
+impl DefaultCqlType for SystemTime {
     type C = types::Timestamp;
 }
 
 #[cfg(feature = "chrono")]
-impl<Tz: chrono::TimeZone> DefaultGrpcType for chrono::DateTime<Tz> {
+impl<Tz: chrono::TimeZone> DefaultCqlType for chrono::DateTime<Tz> {
     type C = types::Timestamp;
 }
 
 #[cfg(feature = "chrono")]
-impl<Tz: chrono::TimeZone> DefaultGrpcType for chrono::Date<Tz> {
+impl<Tz: chrono::TimeZone> DefaultCqlType for chrono::Date<Tz> {
     type C = types::Date;
 }
 
-impl<T> DefaultGrpcType for Option<T>
+impl<T> DefaultCqlType for Option<T>
 where
-    T: DefaultGrpcType,
+    T: DefaultCqlType,
 {
-    type C = <T as DefaultGrpcType>::C;
+    type C = <T as DefaultCqlType>::C;
 }
 
-impl<T> DefaultGrpcType for Vec<T>
+impl<T> DefaultCqlType for Vec<T>
 where
-    T: DefaultGrpcType,
+    T: DefaultCqlType,
 {
-    type C = types::List<<T as DefaultGrpcType>::C>;
+    type C = types::List<<T as DefaultCqlType>::C>;
 }
 
-impl<K, V> DefaultGrpcType for Vec<KeyValue<K, V>>
+impl<K, V> DefaultCqlType for Vec<KeyValue<K, V>>
 where
-    K: DefaultGrpcType,
-    V: DefaultGrpcType,
+    K: DefaultCqlType,
+    V: DefaultCqlType,
 {
-    type C = types::Map<<K as DefaultGrpcType>::C, <V as DefaultGrpcType>::C>;
+    type C = types::Map<<K as DefaultCqlType>::C, <V as DefaultCqlType>::C>;
 }
 
-impl<K, V> DefaultGrpcType for HashMap<K, V>
+impl<T> DefaultCqlType for HashSet<T>
 where
-    K: DefaultGrpcType,
-    V: DefaultGrpcType,
+    T: DefaultCqlType,
 {
-    type C = types::Map<<K as DefaultGrpcType>::C, <V as DefaultGrpcType>::C>;
+    type C = types::Set<<T as DefaultCqlType>::C>;
 }
 
-impl<K, V> DefaultGrpcType for BTreeMap<K, V>
+impl<T> DefaultCqlType for BTreeSet<T>
 where
-    K: DefaultGrpcType,
-    V: DefaultGrpcType,
+    T: DefaultCqlType,
 {
-    type C = types::Map<<K as DefaultGrpcType>::C, <V as DefaultGrpcType>::C>;
+    type C = types::Set<<T as DefaultCqlType>::C>;
+}
+
+impl<K, V> DefaultCqlType for HashMap<K, V>
+where
+    K: DefaultCqlType,
+    V: DefaultCqlType,
+{
+    type C = types::Map<<K as DefaultCqlType>::C, <V as DefaultCqlType>::C>;
+}
+
+impl<K, V> DefaultCqlType for BTreeMap<K, V>
+where
+    K: DefaultCqlType,
+    V: DefaultCqlType,
+{
+    type C = types::Map<<K as DefaultCqlType>::C, <V as DefaultCqlType>::C>;
 }
 
 /// Converts a value of Rust type into a Value of given Cassandra type.
@@ -641,7 +655,7 @@ impl Value {
         value.into_value()
     }
 
-    /// Constructs a CQL `list`, `set` or `tuple` value.
+    /// Constructs a CQL `list` or `tuple` value.
     ///
     /// Items are converted to `Value` using the default conversion associated
     /// with their actual type.
@@ -682,6 +696,29 @@ impl Value {
     {
         let elements = elements.into_iter().map(|e| e.into_value()).collect_vec();
         Value::raw_collection(elements)
+    }
+
+    /// Constructs a CQL `set` value.
+    ///
+    /// Actually it is just an alias for `list`,
+    /// because internally there is no difference.
+    pub fn set<I, T>(elements: I) -> Value
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Value>,
+    {
+        Value::set_of(types::Any, elements)
+    }
+
+    /// Constructs a CQL `set` value with elements of specified type.
+    /// Actually it is just an alias for `list_of`,
+    /// because internally lists and sets are encoded in the same way.
+    pub fn set_of<E, I, T>(element_type: E, elements: I) -> Value
+    where
+        I: IntoIterator<Item = T>,
+        T: IntoValue<E>,
+    {
+        Value::list_of(element_type, elements)
     }
 
     /// Converts a collection of key-value pairs to a CQL `map` value.
@@ -806,10 +843,10 @@ impl Value {
 
 impl<R> From<R> for Value
 where
-    R: DefaultGrpcType + IntoValue<<R as into_value::DefaultGrpcType>::C>,
+    R: DefaultCqlType + IntoValue<<R as into_value::DefaultCqlType>::C>,
 {
     fn from(value: R) -> Self {
-        Value::convert::<R, <R as DefaultGrpcType>::C>(value)
+        Value::convert::<R, <R as DefaultCqlType>::C>(value)
     }
 }
 
@@ -922,10 +959,10 @@ macro_rules! gen_tuple_conversion {
             }
         }
 
-        impl<$($R),+> DefaultGrpcType for ($($R),+)
-        where $($R: DefaultGrpcType),+
+        impl<$($R),+> DefaultCqlType for ($($R),+)
+        where $($R: DefaultCqlType),+
         {
-            type C = ($(<$R as DefaultGrpcType>::C),+);
+            type C = ($(<$R as DefaultCqlType>::C),+);
         }
 
 
@@ -1015,6 +1052,26 @@ where
     }
 }
 
+impl<R, C> IntoValue<types::Set<C>> for HashSet<R>
+where
+    R: IntoValue<C> + Eq + Hash,
+{
+    fn into_value(self) -> Value {
+        let elements = self.into_iter().map(|e| e.into_value()).collect_vec();
+        Value::raw_collection(elements)
+    }
+}
+
+impl<R, C> IntoValue<types::Set<C>> for BTreeSet<R>
+where
+    R: IntoValue<C> + Ord,
+{
+    fn into_value(self) -> Value {
+        let elements = self.into_iter().map(|e| e.into_value()).collect_vec();
+        Value::raw_collection(elements)
+    }
+}
+
 impl<RK, RV, CK, CV> IntoValue<types::Map<CK, CV>> for Vec<(RK, RV)>
 where
     RK: IntoValue<CK>,
@@ -1084,7 +1141,8 @@ impl<Tz: chrono::TimeZone> IntoValue<types::Date> for chrono::Date<Tz> {
 
 #[cfg(test)]
 mod test {
-    use std::collections::{BTreeMap, HashMap};
+    use itertools::Itertools;
+    use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use proto::value::Inner;
@@ -1310,11 +1368,14 @@ mod test {
     fn convert_vec_of_dates_into_value() {
         let list = vec![i32::MIN, 0, i32::MAX];
         let v = Value::of_type(List(Date), list);
-        assert_eq!(v, Value::list(
-            vec![
+        assert_eq!(
+            v,
+            Value::list(vec![
                 Value::raw_date(0),
                 Value::raw_date(1 << 31),
-                Value::raw_date(u32::MAX)]));
+                Value::raw_date(u32::MAX)
+            ])
+        );
     }
 
     #[test]
@@ -1332,6 +1393,28 @@ mod test {
             Value::of_type(Map(Int, types::String), list2),
             expected.clone()
         );
+    }
+
+    #[test]
+    fn convert_hash_set_into_value() {
+        let mut set = HashSet::new();
+        set.insert(1);
+        set.insert(2);
+        set.insert(3);
+
+        let elements = set.iter().map(|e| Value::int(*e)).collect_vec();
+        assert_eq!(Value::from(set), Value::set(elements));
+    }
+
+    #[test]
+    fn convert_btree_set_into_value() {
+        let mut set = BTreeSet::new();
+        set.insert(1);
+        set.insert(2);
+        set.insert(3);
+
+        let elements = set.iter().map(|e| Value::int(*e)).collect_vec();
+        assert_eq!(Value::from(set), Value::set(elements));
     }
 
     #[test]
