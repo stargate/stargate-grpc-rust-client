@@ -1163,8 +1163,10 @@ impl<Tz: chrono::TimeZone> IntoValue<types::Timestamp> for chrono::DateTime<Tz> 
 #[cfg(feature = "chrono")]
 impl<Tz: chrono::TimeZone> IntoValue<types::Date> for chrono::Date<Tz> {
     fn into_value(self) -> Value {
-        use chrono::Datelike;
-        Value::date(self.num_days_from_ce())
+        use chrono::{DateTime, Utc};
+        use std::time::UNIX_EPOCH;
+        let unix_epoch = DateTime::<Utc>::from(UNIX_EPOCH).date();
+        Value::date(self.signed_duration_since(unix_epoch).num_days() as i32)
     }
 }
 
@@ -1306,23 +1308,19 @@ mod test {
     #[test]
     #[cfg(feature = "chrono")]
     fn convert_chrono_utc_date_into_value() {
-        use chrono::Datelike;
-        let date = chrono::Utc::now().date();
-        let days = date.num_days_from_ce();
+        use chrono::{DateTime, Utc};
+        let date = DateTime::<Utc>::from(std::time::UNIX_EPOCH).date();
         let value = Value::from(date);
-        assert_eq!(value, Value::date(days));
-        let value = Value::date(date);
-        assert_eq!(value, Value::date(days));
+        assert_eq!(value, Value::date(0));
     }
 
     #[test]
     #[cfg(feature = "chrono")]
     fn convert_chrono_local_date_into_value() {
-        use chrono::Datelike;
-        let date = chrono::Local::now().date();
-        let days = date.num_days_from_ce();
+        use chrono::{DateTime, Local};
+        let date = DateTime::<Local>::from(std::time::UNIX_EPOCH).date();
         let value = Value::from(date);
-        assert_eq!(value, Value::date(days));
+        assert_eq!(value, Value::date(0));
     }
 
     #[test]

@@ -271,13 +271,14 @@ gen_conversion!(chrono::DateTime<chrono::Local>; value::Inner::Int(millis) => {
 
 #[cfg(feature = "chrono")]
 fn into_naive_date(days: u32) -> Result<chrono::NaiveDate, ConversionError> {
-    let days: i32 = (days as i64 + i32::MIN as i64) as i32;
+    let days = days as i64 + i32::MIN as i64;
     let err = || ConversionError::out_of_range::<_, chrono::Date<chrono::Local>>(days);
-    if days > i32::MAX - 365 {
-        // protect from chrono numerical overflow
-        return Err(err());
-    }
-    chrono::NaiveDate::from_num_days_from_ce_opt(days).ok_or_else(err)
+    let epoch = chrono::DateTime::<chrono::Utc>::from(UNIX_EPOCH)
+        .date()
+        .naive_utc();
+    epoch
+        .checked_add_signed(chrono::Duration::days(days))
+        .ok_or_else(err)
 }
 
 #[cfg(feature = "chrono")]
@@ -631,14 +632,9 @@ mod test {
     #[test]
     #[cfg(feature = "chrono")]
     fn convert_value_to_chrono_date() {
-        use chrono::Datelike;
         let v = Value::date(0);
         let date: chrono::Date<chrono::Utc> = v.try_into().unwrap();
-        assert_eq!(date.num_days_from_ce(), 0);
-
-        let v = Value::date(100_000);
-        let date: chrono::Date<chrono::Utc> = v.try_into().unwrap();
-        assert_eq!(date.num_days_from_ce(), 100_000);
+        assert_eq!(date.to_string(), "1970-01-01UTC".to_owned());
     }
 
     #[test]
