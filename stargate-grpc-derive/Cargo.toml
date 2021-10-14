@@ -3,6 +3,11 @@ name = "stargate-grpc-derive"
 description = "Struct mapper for stargate-grpc"
 version = "0.1.0"
 edition = "2018"
+categories = ["api-bindings", "database"]
+keywords = ["grpc", "stargate", "cassandra"]
+homepage = "https://github.com/stargate/stargate-grpc-rust-client"
+repository = "https://github.com/stargate/stargate-grpc-rust-client"
+license = "Apache-2.0"
 
 [lib]
 proc-macro = true
