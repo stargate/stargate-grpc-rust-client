@@ -17,7 +17,7 @@
 //! Add required dependencies.
 //!
 //! ```toml
-//! [devependencies]
+//! [dependencies]
 //! stargate-grpc = "0.1"
 //! tokio = { version = "1", features = ["full"]}
 //! ```
@@ -255,8 +255,9 @@
 //! ```
 //!
 //! ### Mapping Rust structs to user defined types
-//! Feature [`stargate-grpc-derive`](../stargate_grpc_derive) allows to
-//! generate conversions between `Value`s and your Rust structs by adding
+//! Feature
+//! [`stargate-grpc-derive`](/stargate_grpc_derive/)
+//! allows to generate conversions between `Value`s and your Rust structs by adding
 //! the `#[derive(IntoValue, TryFromValue)]` attribute on top of a struct definition.
 //!
 //!
