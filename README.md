@@ -82,12 +82,12 @@ for row in result_set.rows {
 }
 ```
 
-It is also possible to read each field separately and convert it to desired type, without
-dropping the original `row`:
+It is also possible to move each field separately out of the `row` and to convert 
+it to desired type:
 ```rust
-for row in result_set.rows {
-    let login: String = row.get(0)?;
-    let emails: Vec<String> = row.get(1)?;
+for mut row in result_set.rows {
+    let login: String = row.try_take(0)?;         // == row.values[0].take().try_into()?;
+    let emails: Vec<String> = row.try_take(1)?;   // == row.values[1].take().try_into()?;
     // ...
 }
 ```
