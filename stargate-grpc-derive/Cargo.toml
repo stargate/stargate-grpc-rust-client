@@ -20,4 +20,8 @@ quote = "1.0.10"
 syn = "1.0"
 
 [dev-dependencies]
+skeptic = "0.13"
 stargate-grpc = { path = "../stargate-grpc" }
+
+[build-dependencies]
+skeptic = "0.13"

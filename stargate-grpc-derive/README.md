@@ -11,7 +11,7 @@ This crate provides the following derive macros:
  - `TryFromRow` – enables converting a `Row` received in a result set to a Rust value
 
 ## Example
-```rust
+```rust,skt-simple-main
 use stargate_grpc::Value;
 use stargate_grpc_derive::{IntoValue, TryFromValue};
 

@@ -1,4 +1,4 @@
-# Rust gRPC Client Driver for Stargate  
+# Rust gRPC Client Driver for Stargate
 
 This crate provides a high-level async Rust driver for querying [Stargate](https://stargate.io/).
 It exposes the client stubs generated from gRPC proto files together with a set of 
@@ -6,9 +6,6 @@ utilities that make them easier to work with.
 
 - [Features](#features)
 - [Quick start guide](#quick-start-guide)
-   - [Connecting](#establishing-the-connection)
-   - [Querying](#querying)
-   - [Processing the result set](#processing-the-result-set)
 - [Building](#building-from-source)
 - [Running the examples](#running-the-examples)
 
@@ -28,54 +25,60 @@ e.g. [tokio](https://tokio.rs/) or [async-std](https://async.rs/).
 
 ```toml
 [dependencies]
-stargate-grpc = "0.1"
+stargate-grpc = "0.2"
 tokio = { version = "1", features = ["full"]}
 ```
 
-At this point you should be able to build the project now with `cargo build` and it would fetch and compile 
+At this point you should be able to build the project with `cargo build` and it would fetch and compile 
 the dependencies. 
 
 For convenience, add the following line to the includes in the source code of your app:
-```rust
+```rust,skt-empty-main
 use stargate_grpc::*;
 ```
+
+All the code below assumes it is executed in an async context (e.g. inside `async main`).
 
 ### Connecting
 The main structure that provides the interface to Stargate is `StargateClient`.
 The simplest way to obtain an instance is to use the provided `builder`:
 
-```rust
+```rust,skt-connect,no_run
+use std::str::FromStr;
+
 let mut client = StargateClient::builder()
-    .uri("http://localhost:8090/")?
-    .auth_token(AuthToken::from_str("00000000-0000-0000-0000-000000000000")?)                                         
-    .tls(Some(client::default_tls_config()?))   // optional
+    .uri("http://localhost:8090/")?                                            // replace with a proper address
+    .auth_token(AuthToken::from_str("00000000-0000-0000-0000-000000000000")?)  // replace with a proper token                                      
+    .tls(Some(client::default_tls_config()?))                                  // optionally enable TLS
     .connect()
     .await?;
 ```
 
 ### Querying 
-Use `QueryBuilder` to create a query, bind query values and pass query parameters:
+Use `Query::builder` to create a query, bind query values and pass query parameters:
 
-```rust
+```rust,skt-query
 let query = Query::builder()
-    .keyspace("test")                           // set the keyspace the query applies to
-    .consistency(Consistency::LocalQuorum)      // set consistency level
-    .query("SELECT login, emails FROM users WHERE id = :id")
-    .bind_name("id", 1000)                      // bind :id to 1000
-    .build();                                   // build the Query
+    .keyspace("test")                                               // set the keyspace the query applies to
+    .consistency(Consistency::LocalQuorum)                          // set consistency level
+    .query("SELECT login, emails FROM users WHERE id = :id")        // set the CQL string
+    .bind_name("id", 1000)                                          // bind :id to 1000
+    .build();                                                       // build the Query
 ```
 
 Run the query and wait for its results:
-```rust
+```rust,skt-execute,no_run
+use std::convert::TryInto;
+
 let response = client.execute_query(query).await?;  // send the query and wait for gRPC response
-let result_set: ResultSet = response.try_into()?;   // convert the response into ResultSet
+let result_set: ResultSet = response.try_into()?;   // convert the response to a ResultSet
 ```
 
 ### Processing the result set
 The result set comes back as a collection of rows. A`Row` can be easily unpacked
 into a tuple:
 
-```rust
+```rust,skt-result,no_run
 for row in result_set.rows {
     let (login, emails): (String, Vec<String>) = row.try_into()?;
     // ...
@@ -84,14 +87,13 @@ for row in result_set.rows {
 
 It is also possible to move each field separately out of the `row` and to convert 
 it to desired type:
-```rust
+```rust,skt-result,no_run
 for mut row in result_set.rows {
     let login: String = row.try_take(0)?;         // == row.values[0].take().try_into()?;
     let emails: Vec<String> = row.try_take(1)?;   // == row.values[1].take().try_into()?;
     // ...
 }
 ```
-
 
 ## Building from source
 1. Install Rust toolchain:

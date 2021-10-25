@@ -142,10 +142,6 @@ use darling::{ast, util, FromDeriveInput, FromField};
 use quote::quote;
 use syn::__private::TokenStream2;
 
-// Verify examples in the readme:
-#[doc = include_str!("../README.md")]
-type _DoctestReadme = ();
-
 #[derive(Debug, FromField)]
 #[darling(attributes(stargate))]
 struct UdtField {
