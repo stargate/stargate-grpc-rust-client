@@ -4,7 +4,7 @@
 //! This module defines a few derive macros that can generate the conversion code automatically
 //! for you.
 //!
-//! ## Converting a Rust struct to a `Value`
+//! ## Converting a custom Rust struct to a `Value`
 //! ```
 //! use stargate_grpc::Value;
 //! use stargate_grpc_derive::IntoValue;
@@ -20,7 +20,7 @@
 //! assert_eq!(value, Value::udt(vec![("id", Value::bigint(1)), ("login", Value::string("user"))]))
 //! ```
 //!
-//! ## Converting a `Value` to a Rust struct
+//! ## Converting a `Value` to a custom Rust struct
 //! ```
 //! use stargate_grpc::Value;
 //! use stargate_grpc_derive::TryFromValue;
@@ -38,7 +38,7 @@
 //! assert_eq!(user.login, "user".to_string());
 //! ```
 //!
-//! ## Using structs as arguments in queries
+//! ## Using custom structs as arguments in queries
 //! It is possible to unpack struct fields in such a way that each field value
 //! gets bound to a named argument of a query. For that to work, the struct must implement
 //! [`std::convert::Into<Values>`] trait. You can derive such trait automatically:
@@ -58,6 +58,28 @@
 //!     .query("INSERT INTO users(id, login) VALUES (:id, :login)")
 //!     .bind(user)  // bind user.id to :id and user.login to :login
 //!     .build();
+//! ```
+//! ## Converting result set rows to custom struct values
+//! You can convert a `Row` to a value of your custom type by deriving
+//! [`TryFromRow`] and then passing the rows to a mapper:
+//!
+//! ```no_run
+//! use stargate_grpc::*;
+//! use stargate_grpc_derive::*;
+//!
+//! #[derive(Debug, TryFromRow)]
+//! struct User {
+//!     id: i64,
+//!     login: String,
+//! }
+//!
+//! let result_set: ResultSet = unimplemented!();  // replace with actual code to run a query
+//! let mapper = result_set.mapper().unwrap();
+//! for row in result_set.rows {
+//!     let user: User = mapper.try_unpack(row).unwrap();
+//!     println!("{:?}", user)
+//! }
+//!
 //! ```
 //!
 //! ## Options
@@ -119,6 +141,10 @@ use darling::util::Override;
 use darling::{ast, util, FromDeriveInput, FromField};
 use quote::quote;
 use syn::__private::TokenStream2;
+
+// Verify examples in the readme:
+#[doc = include_str!("../README.md")]
+type _DoctestReadme = ();
 
 #[derive(Debug, FromField)]
 #[darling(attributes(stargate))]

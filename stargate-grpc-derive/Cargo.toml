@@ -8,6 +8,7 @@ keywords = ["grpc", "stargate", "cassandra"]
 homepage = "https://github.com/stargate/stargate-grpc-rust-client"
 repository = "https://github.com/stargate/stargate-grpc-rust-client"
 license = "Apache-2.0"
+readme = "README.md"
 
 [lib]
 proc-macro = true

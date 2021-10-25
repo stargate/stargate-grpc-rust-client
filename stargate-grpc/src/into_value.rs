@@ -540,9 +540,12 @@ impl Value {
     ///     Value::time(1000),
     ///     Value::time(2000)
     /// ]));
-    ///
-    /// // This wouldn't compile:
-    /// // let strings = Value::of_type(List(String), vec![1, 2]);
+    /// ```
+    /// ```compile_fail
+    /// # use stargate_grpc::Value;
+    /// # use stargate_grpc::types::*;
+    /// // This line wouldn't compile:
+    /// let strings = Value::of_type(List(String), vec![1, 2]);
     /// ```
     ///
     /// In cases where you don't want to describe the result type fully, or where you need
