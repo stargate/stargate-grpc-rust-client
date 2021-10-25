@@ -1,7 +1,7 @@
 [package]
 name = "stargate-grpc-derive"
 description = "Struct mapper for stargate-grpc"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2018"
 categories = ["api-bindings", "database"]
 keywords = ["grpc", "stargate", "cassandra"]
