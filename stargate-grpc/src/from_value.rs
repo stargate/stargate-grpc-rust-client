@@ -116,7 +116,7 @@ use std::iter::FromIterator;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use itertools::Itertools;
-use num::FromPrimitive;
+use num_traits::FromPrimitive;
 
 use crate::error::ConversionError;
 use crate::proto::{value, Row, Value};
