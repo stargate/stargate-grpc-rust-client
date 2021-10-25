@@ -35,7 +35,7 @@ mod derive {
     fn convert_struct_to_udt_value_with_typed_fields() {
         #[derive(IntoValue)]
         struct Date {
-            #[stargate(grpc_type = "types::Date")]
+            #[stargate(cql_type = "types::Date")]
             days: i32,
         }
         let days = Date { days: 34835 };

@@ -92,8 +92,8 @@
 //! }
 //! ```
 //!
-//! ### `#[stargate(grpc_type = "type")]`
-//! Sets the target gRPC type the field should be converted into, useful
+//! ### `#[stargate(cql_type = "type")]`
+//! Sets the target CQL type the field should be converted into, useful
 //! when there are multiple possibilities.
 //!
 //! ```
@@ -102,9 +102,9 @@
 //!
 //! #[derive(IntoValue)]
 //! struct InetAndUuid {
-//!     #[stargate(grpc_type = "types::Inet")]
+//!     #[stargate(cql_type = "types::Inet")]
 //!     inet: [u8; 16],
-//!     #[stargate(grpc_type = "types::Uuid")]
+//!     #[stargate(cql_type = "types::Uuid")]
 //!     uuid: [u8; 16],
 //! }
 //! ```
@@ -128,7 +128,7 @@ struct UdtField {
     #[darling(default)]
     default: Option<Override<String>>,
     #[darling(default)]
-    grpc_type: Option<String>,
+    cql_type: Option<String>,
     #[darling(default)]
     skip: bool,
     #[darling(default)]
@@ -171,10 +171,10 @@ fn token_stream(s: &str) -> proc_macro2::TokenStream {
 /// Emits code for reading the field value and converting it to a `Value`.
 fn convert_to_value(obj: &syn::Ident, field: &UdtField) -> TokenStream2 {
     let field_ident = field.ident.as_ref().unwrap();
-    match &field.grpc_type {
+    match &field.cql_type {
         Some(t) => {
-            let grpc_type = token_stream(t.as_str());
-            quote! { stargate_grpc::Value::of_type(#grpc_type, #obj.#field_ident) }
+            let cql_type = token_stream(t.as_str());
+            quote! { stargate_grpc::Value::of_type(#cql_type, #obj.#field_ident) }
         }
         None => {
             quote! { stargate_grpc::Value::from(#obj.#field_ident) }
