@@ -1,3 +1,6 @@
+This file contains code templates used by code snippets in README.md.
+The code from README  `{}` 
+
 ```rust,skt-empty-main
 {}
 fn main() {{}}
@@ -24,7 +27,7 @@ use stargate_grpc::*;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {{
   let client: StargateClient = unimplemented!();
-  let query: proto::Query = unimplemented!();
+  let query: Query = unimplemented!();
   {}  
   Ok(())
 }}
