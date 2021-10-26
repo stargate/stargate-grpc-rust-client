@@ -47,9 +47,9 @@ The simplest way to obtain an instance is to use the provided `builder`:
 use std::str::FromStr;
 
 let mut client = StargateClient::builder()
-    .uri("http://localhost:8090/")?                                            // replace with a proper address
-    .auth_token(AuthToken::from_str("00000000-0000-0000-0000-000000000000")?)  // replace with a proper token                                      
-    .tls(Some(client::default_tls_config()?))                                  // optionally enable TLS
+    .uri("http://localhost:8090/")?                           // replace with a proper address
+    .auth_token(AuthToken::from_str("XXXX-YYYY-ZZZZ...")?)    // replace with a proper token
+    .tls(Some(client::default_tls_config()?))                 // optionally enable TLS
     .connect()
     .await?;
 ```
@@ -59,11 +59,11 @@ Use `Query::builder` to create a query, bind query values and pass query paramet
 
 ```rust,skt-query
 let query = Query::builder()
-    .keyspace("test")                                               // set the keyspace the query applies to
-    .consistency(Consistency::LocalQuorum)                          // set consistency level
-    .query("SELECT login, emails FROM users WHERE id = :id")        // set the CQL string
-    .bind_name("id", 1000)                                          // bind :id to 1000
-    .build();                                                       // build the Query
+    .keyspace("test")                                         // set the keyspace the query applies to
+    .consistency(Consistency::LocalQuorum)                    // set consistency level
+    .query("SELECT login, emails FROM users WHERE id = :id")  // set the CQL string
+    .bind_name("id", 1000)                                    // bind :id to 1000
+    .build();                                                 // build the Query
 ```
 
 Run the query and wait for its results:
@@ -116,15 +116,15 @@ for more details on how to setup Stargate.
 Each example program accepts an URL of the stargate coordinator, 
 the authentication token and the keyspace name:
 
-    cargo run --example <example> [-- [--keyspace <keyspace>] [--token <auth token>] [--tls] [<url>]] 
+    cargo run --example <example> [-- [--keyspace <keyspace>] [--token <token>] [--tls] [<url>]] 
 
 The authentication token value can be also given in the `SG_TOKEN` environment variable.
 
 1. Set up Stargate server. Start Cassandra cluster and launch Stargate:
 
        ccm create stargate -v 3.11.8 -n 1 -s -b
-       ./starctl --cluster-name stargate --cluster-seed 127.0.0.1 --cluster-version 3.11 --listen 127.0.0.2 \
-                 --bind-to-listen-address --simple-snitch
+       ./starctl --cluster-name stargate --cluster-seed 127.0.0.1 --cluster-version 3.11 \ 
+                 --listen 127.0.0.2 --bind-to-listen-address --simple-snitch
 
 2. Obtain the authentication token:
 
