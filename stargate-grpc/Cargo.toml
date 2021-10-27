@@ -8,7 +8,7 @@ repository = "https://github.com/stargate/stargate-grpc-rust-client"
 categories = ["api-bindings", "database"]
 keywords = ["grpc", "stargate", "cassandra"]
 license = "Apache-2.0"
-readme = "../README.md"
+readme = "README.md"
 
 [dependencies]
 bytes = "1.1"
