@@ -18,13 +18,8 @@ impl TryFrom<tonic::Response<crate::proto::Response>> for ResultSet {
     ///
     /// Will return a `ConversionError` if the response does not contain a `ResultSet` message.
     fn try_from(response: tonic::Response<Response>) -> Result<Self, Self::Error> {
-        match &response.get_ref().result {
-            Some(crate::proto::response::Result::ResultSet(payload)) => {
-                use prost::Message;
-                let data: &prost_types::Any = payload.data.as_ref().unwrap();
-                ResultSet::decode(data.value.as_slice())
-                    .map_err(|e| ConversionError::decode_error::<_, Self>(response, e))
-            }
+        match response.into_inner().result {
+            Some(crate::proto::response::Result::ResultSet(result_set)) => Ok(result_set),
             other => Err(ConversionError::incompatible::<_, Self>(other)),
         }
     }
