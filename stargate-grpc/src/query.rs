@@ -2,7 +2,7 @@
 
 use crate::into_value::IntoValue;
 use crate::proto::{
-    Batch, BatchParameters, BatchQuery, Consistency, Payload, Query, QueryParameters, Value, Values,
+    Batch, BatchParameters, BatchQuery, Consistency, Query, QueryParameters, Value, Values,
 };
 
 impl From<Vec<Value>> for Values {
@@ -49,7 +49,7 @@ impl From<Vec<Value>> for Values {
 #[derive(Default, Clone)]
 pub struct QueryBuilder {
     cql: Option<String>,
-    payload: PayloadBuilder,
+    values: ValuesBuilder,
     parameters: QueryParameters,
 }
 
@@ -93,7 +93,7 @@ impl QueryBuilder {
     /// # Panics
     /// Will panic if it is called after a call to [`bind_name`](QueryBuilder::bind_name)
     pub fn bind<I: Into<Values>>(mut self, values: I) -> Self {
-        self.payload.bind(values);
+        self.values.bind(values);
         self
     }
 
@@ -116,7 +116,7 @@ impl QueryBuilder {
     /// # Panics
     /// Will panic if it is called after a call to [`bind_name`](QueryBuilder::bind_name)
     pub fn bind_ith<T: Into<Value>>(mut self, index: usize, value: T) -> Self {
-        self.payload.bind_ith(index, value);
+        self.values.bind_ith(index, value);
         self
     }
 
@@ -137,7 +137,7 @@ impl QueryBuilder {
     /// Will panic if mixed with calls to [`bind`](QueryBuilder::bind)
     /// or [`bind_ith`](QueryBuilder::bind_ith).
     pub fn bind_name<T: Into<Value>>(mut self, name: &str, value: T) -> Self {
-        self.payload.bind_name(name, value);
+        self.values.bind_name(name, value);
         self
     }
 
@@ -223,7 +223,7 @@ impl QueryBuilder {
     pub fn build(mut self) -> Query {
         Query {
             cql: self.cql.expect("cql string"),
-            values: self.payload.build(),
+            values: self.values.build(),
             parameters: Some(self.parameters),
         }
     }
@@ -254,7 +254,7 @@ impl Query {
 #[derive(Default, Clone)]
 pub struct BatchBuilder {
     cql: Option<String>,
-    payload: PayloadBuilder,
+    values: ValuesBuilder,
     parameters: BatchParameters,
     built_queries: Vec<BatchQuery>,
 }
@@ -281,7 +281,7 @@ impl BatchBuilder {
     /// # Panics
     /// Will panic if it is called after a call to [`bind_name`](BatchBuilder::bind_name)
     pub fn bind<I: Into<Values>>(mut self, values: I) -> Self {
-        self.payload.bind(values);
+        self.values.bind(values);
         self
     }
 
@@ -292,7 +292,7 @@ impl BatchBuilder {
     /// so that the `index` is valid, and any previously
     /// unset values are filled with [`Value::unset`].
     pub fn bind_ith<T: Into<Value>>(mut self, index: usize, value: T) -> Self {
-        self.payload.bind_ith(index, value);
+        self.values.bind_ith(index, value);
         self
     }
 
@@ -304,7 +304,7 @@ impl BatchBuilder {
     /// Will panic if mixed with calls to [`bind`](BatchBuilder::bind)
     /// or [`bind_ith`](BatchBuilder::bind_ith).
     pub fn bind_name<T: Into<Value>>(mut self, name: &str, value: T) -> Self {
-        self.payload.bind_name(name, value);
+        self.values.bind_name(name, value);
         self
     }
 
@@ -375,7 +375,7 @@ impl BatchBuilder {
         if let Some(cql) = self.cql.take() {
             self.built_queries.push(BatchQuery {
                 cql,
-                values: self.payload.build(),
+                values: self.values.build(),
             });
         }
     }
@@ -388,14 +388,15 @@ impl Batch {
     }
 }
 
-/// The logic of building the query payload shared between [`QueryBuilder`] and [`BatchBuilder`]
+/// The logic of building the query argument values,
+/// shared between [`QueryBuilder`] and [`BatchBuilder`]
 #[derive(Default, Clone)]
-struct PayloadBuilder {
+struct ValuesBuilder {
     values: Vec<Value>,
     value_names: Vec<String>,
 }
 
-impl PayloadBuilder {
+impl ValuesBuilder {
     pub fn bind<I: Into<Values>>(&mut self, values: I) {
         if !self.value_names.is_empty() {
             panic!("Mixing named with non-named values is not allowed")
@@ -423,23 +424,17 @@ impl PayloadBuilder {
         self.values.push(value.into_value());
     }
 
-    pub fn build(&mut self) -> Option<Payload> {
-        use prost::Message;
-
+    /// If there were any values bound with one of the `bind_` calls, moves them to the
+    /// return `Values` object. If no values were bound, returns `None`.
+    /// After returning, `self` is left in a clean, empty state (the value vectors are cleared).
+    /// This method can be called multiple times.
+    pub fn build(&mut self) -> Option<Values> {
         if self.values.is_empty() {
             None
         } else {
-            let v = Values {
+            Some(Values {
                 values: self.values.drain(0..).collect(),
                 value_names: self.value_names.drain(0..).collect(),
-            };
-            let data = v.encode_to_vec();
-            Some(Payload {
-                r#type: 0,
-                data: Some(prost_types::Any {
-                    type_url: "type.googleapis.com/stargate.Values".to_string(),
-                    value: data,
-                }),
             })
         }
     }
