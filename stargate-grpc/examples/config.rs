@@ -3,13 +3,13 @@
 
 use std::io;
 
-use clap::Clap;
+use clap::Parser;
 use tonic::transport::ClientTlsConfig;
 
 use stargate_grpc::client::default_tls_config;
 use stargate_grpc::AuthToken;
 
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 #[clap(name = "Stargate Rust gRPC client demo program")]
 pub struct Config {
     /// Keyspace name to use; on Astra it must match the keyspace of the database

@@ -28,8 +28,8 @@ stargate-grpc-derive = { version = "0.2", path = "../stargate-grpc-derive", opti
 [dev-dependencies]
 anyhow = "1.0.44"
 chrono = "0.4.19"
-clap = "3.0.0-beta.4"
-clap_derive = "3.0.0-beta.4"
+clap = "=3.0.0-beta.5"
+clap_derive = "=3.0.0-beta.5"
 skeptic = "0.13"
 tokio = { version = "^1.12.0", features = ["rt-multi-thread"] }
 uuid = { version = "0.8", features = ["v4"] }
