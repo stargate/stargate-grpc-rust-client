@@ -25,7 +25,7 @@ e.g. [tokio](https://tokio.rs/) or [async-std](https://async.rs/).
 
 ```toml
 [dependencies]
-stargate-grpc = "0.2"
+stargate-grpc = "0.3"
 tokio = { version = "1", features = ["full"]}
 ```
 
