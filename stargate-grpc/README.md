@@ -133,7 +133,7 @@ The authentication token value can be also given in the `SG_TOKEN` environment v
 
 2. Obtain the authentication token:
 
-       curl -L -X POST 'http://127.0.0.2:8081/v1/auth' \
+       curl -L -X POST 'http://127.0.0.1:8081/v1/auth' \
             -H 'Content-Type: application/json' \
             --data-raw '{
                "username": "cassandra",
@@ -149,7 +149,7 @@ The authentication token value can be also given in the `SG_TOKEN` environment v
 4. Run the `keyspace` example to test the connection and create the test keyspace (default keyspace name: `stargate_examples`)
 
        cargo run --example keyspace 
-       Connected to http://127.0.0.2:8090
+       Connected to http://127.0.0.1:8090
        Created keyspace stargate_examples
 
 5. Run the other examples:
@@ -157,7 +157,7 @@ The authentication token value can be also given in the `SG_TOKEN` environment v
        cargo run --example query 
        Finished dev [unoptimized + debuginfo] target(s) in 0.04s
        Running `target/debug/examples/basic`
-       Connected to http://127.0.0.2:8090
+       Connected to http://127.0.0.1:8090
        Created schema
        Inserted data. Now querying.
        All rows:
