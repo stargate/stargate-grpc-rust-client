@@ -120,15 +120,20 @@ the authentication token and the keyspace name:
 
 The authentication token value can be also given in the `SG_TOKEN` environment variable.
 
-1. Set up Stargate server. Start Cassandra cluster and launch Stargate:
+1. Set up Stargate server in developer mode using Docker:
 
-       ccm create stargate -v 3.11.8 -n 1 -s -b
-       ./starctl --cluster-name stargate --cluster-seed 127.0.0.1 --cluster-version 3.11 \ 
-                 --listen 127.0.0.2 --bind-to-listen-address --simple-snitch
+       docker run --name stargate \
+        -p 8081:8081 \
+        -p 8090:8090 \
+        -d \
+        -e CLUSTER_NAME=stargate \
+        -e CLUSTER_VERSION=3.11 \
+        -e DEVELOPER_MODE=true \
+        stargateio/stargate-3_11:v1.0.42
 
 2. Obtain the authentication token:
 
-       curl -L -X POST 'http://127.0.0.2:8081/v1/auth' \
+       curl -L -X POST 'http://127.0.0.1:8081/v1/auth' \
             -H 'Content-Type: application/json' \
             --data-raw '{
                "username": "cassandra",
@@ -144,7 +149,7 @@ The authentication token value can be also given in the `SG_TOKEN` environment v
 4. Run the `keyspace` example to test the connection and create the test keyspace (default keyspace name: `stargate_examples`)
 
        cargo run --example keyspace 
-       Connected to http://127.0.0.2:8090
+       Connected to http://127.0.0.1:8090
        Created keyspace stargate_examples
 
 5. Run the other examples:
@@ -152,7 +157,7 @@ The authentication token value can be also given in the `SG_TOKEN` environment v
        cargo run --example query 
        Finished dev [unoptimized + debuginfo] target(s) in 0.04s
        Running `target/debug/examples/basic`
-       Connected to http://127.0.0.2:8090
+       Connected to http://127.0.0.1:8090
        Created schema
        Inserted data. Now querying.
        All rows:
