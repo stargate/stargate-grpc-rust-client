@@ -306,7 +306,7 @@ macro_rules! gen_tuple_conversion {
 
         // Converts values to tuples
         // E.g. for 2-ary tuples expands to: `impl <A2, A1> TryFromValue for (A2, A1)`
-        impl<$($T),+> TryFromValue for ($($T),+)
+        impl<$($T),+> TryFromValue for ($($T),+,)
         where $($T: TryFromValue),+
         {
             fn try_from(value: Value) -> Result<Self, ConversionError> {
@@ -320,7 +320,7 @@ macro_rules! gen_tuple_conversion {
                         }
                         let mut i = c.elements.into_iter();
                         Ok((
-                            $({ let x: $T = i.next().unwrap().try_into()?; x }),+
+                            $({ let x: $T = i.next().unwrap().try_into()?; x }),+,
                         ))
                     }
                     other => Err(ConversionError::incompatible::<_, Self>(other)),
@@ -330,10 +330,10 @@ macro_rules! gen_tuple_conversion {
 
         // Generates an analog `TryFrom<Value>` for tuples.
         // for 2-ary tuples expands to: `gen_std_conversion_generic!(<A2, A1> (A2, A1))`
-        gen_std_conversion_generic!(<$($T),+> ($($T),+));
+        gen_std_conversion_generic!(<$($T),+> ($($T),+,));
 
         // Converts rows to tuples
-        impl<$($T),+> TryFrom<Row> for ($($T),+)
+        impl<$($T),+> TryFrom<Row> for ($($T),+,)
         where $($T: TryFromValue),+
         {
             type Error = ConversionError;
@@ -346,7 +346,7 @@ macro_rules! gen_tuple_conversion {
                 }
                 let mut i = row.values.into_iter();
                 Ok((
-                    $({ let x: $T = i.next().unwrap().try_into()?; x }),+
+                    $({ let x: $T = i.next().unwrap().try_into()?; x }),+,
                 ))
             }
         }
@@ -356,10 +356,12 @@ macro_rules! gen_tuple_conversion {
 /// Calls `gen_convert_value_tuple!` recursively to generate conversions for all tuples
 /// starting at size 2 and ending at the size specified by the number of arguments.
 macro_rules! gen_all_tuple_conversions {
-    ($first:ident) => {};
-    ($first:ident, $($tail:ident),*) => {
-        gen_tuple_conversion!($first, $($tail),*);
-        gen_all_tuple_conversions!($($tail),*);
+    ($first:ident) => {
+        gen_tuple_conversion!($first);
+    };
+    ($first:ident, $($tail:ident),+) => {
+        gen_tuple_conversion!($first, $($tail),+);
+        gen_all_tuple_conversions!($($tail),+);
     }
 }
 
@@ -729,6 +731,13 @@ mod test {
     }
 
     #[test]
+    fn convert_value_to_a_single_item_tuple() {
+        let v = Value::list(vec![Value::bigint(1)]);
+        let (a,): (i64,) = v.try_into().unwrap();
+        assert_eq!(a, 1);
+    }
+
+    #[test]
     fn convert_value_to_tuples() {
         let v1 = Value::bigint(1);
         let v2 = Value::float(2.5);
@@ -789,6 +798,14 @@ mod test {
         let mut row = Row { values };
         let int: Vec<i64> = row.try_take(0).unwrap();
         assert_eq!(int, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn convert_row_to_a_single_item_tuple() {
+        let values = vec![Value::bigint(1)];
+        let row = Row { values };
+        let (a,): (i64,) = row.try_into().unwrap();
+        assert_eq!(a, 1);
     }
 
     #[test]

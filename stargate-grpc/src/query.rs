@@ -439,3 +439,70 @@ impl ValuesBuilder {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::proto::Values;
+    use crate::query::ValuesBuilder;
+    use crate::Value;
+
+    #[test]
+    fn bind_a_single_item_tuple() {
+        let mut builder = ValuesBuilder::default();
+        builder.bind((1,));
+        let values = builder.build();
+        assert_eq!(
+            values,
+            Some(Values {
+                values: vec![Value::int(1)],
+                value_names: vec![]
+            })
+        )
+    }
+
+    #[test]
+    fn bind_a_tuple() {
+        let mut builder = ValuesBuilder::default();
+        builder.bind((1, 2.0, "foo"));
+        let values = builder.build();
+        assert_eq!(
+            values,
+            Some(Values {
+                values: vec![Value::int(1), Value::double(2.0), Value::string("foo")],
+                value_names: vec![]
+            })
+        )
+    }
+
+    #[test]
+    fn bind_ith() {
+        let mut builder = ValuesBuilder::default();
+        builder.bind_ith(0, 1);
+        builder.bind_ith(1, 2.0);
+        builder.bind_ith(2, "foo");
+        let values = builder.build();
+        assert_eq!(
+            values,
+            Some(Values {
+                values: vec![Value::int(1), Value::double(2.0), Value::string("foo")],
+                value_names: vec![]
+            })
+        )
+    }
+
+    #[test]
+    fn bind_name() {
+        let mut builder = ValuesBuilder::default();
+        builder.bind_name("a", 1);
+        builder.bind_name("b", 2.0);
+        builder.bind_name("c", "foo");
+        let values = builder.build();
+        assert_eq!(
+            values,
+            Some(Values {
+                values: vec![Value::int(1), Value::double(2.0), Value::string("foo")],
+                value_names: vec!["a".to_string(), "b".to_string(), "c".to_string()]
+            })
+        );
+    }
+}
