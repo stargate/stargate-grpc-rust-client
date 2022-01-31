@@ -964,7 +964,7 @@ gen_conversion!(uuid::Uuid => types::Uuid; x => Value::raw_uuid(x.as_bytes()));
 macro_rules! gen_tuple_conversion {
     ($($index:tt: $R:ident => $C:ident),+) => {
 
-        impl <$($R),+, $($C),+> IntoValue<($($C),+)> for ($($R),+)
+        impl <$($R),+, $($C),+> IntoValue<($($C),+,)> for ($($R),+,)
         where $($R: IntoValue<$C>),+
         {
             fn into_value(self) -> Value {
@@ -972,7 +972,7 @@ macro_rules! gen_tuple_conversion {
             }
         }
 
-        impl <$($R),+> IntoValue<types::List<types::Any>> for ($($R),+)
+        impl <$($R),+> IntoValue<types::List<types::Any>> for ($($R),+,)
         where $($R: IntoValue<types::Any>),+
         {
             fn into_value(self) -> Value {
@@ -980,10 +980,10 @@ macro_rules! gen_tuple_conversion {
             }
         }
 
-        impl <$($R),+> From<($($R),+)> for proto::Values
+        impl <$($R),+> From<($($R),+,)> for proto::Values
         where $($R: IntoValue<types::Any>),+
         {
-            fn from(tuple: ($($R),+)) -> Self {
+            fn from(tuple: ($($R),+,)) -> Self {
                 proto::Values {
                     values: vec![$(tuple.$index.into_value()),+],
                     value_names: vec![]
@@ -991,13 +991,11 @@ macro_rules! gen_tuple_conversion {
             }
         }
 
-        impl<$($R),+> DefaultCqlType for ($($R),+)
+        impl<$($R),+> DefaultCqlType for ($($R),+,)
         where $($R: DefaultCqlType),+
         {
-            type C = ($(<$R as DefaultCqlType>::C),+);
+            type C = ($(<$R as DefaultCqlType>::C),+,);
         }
-
-
     }
 }
 
@@ -1006,6 +1004,8 @@ macro_rules! gen_tuple_conversion {
 // but then this would force us to process tuples right-to-left and the result vector would
 // be also reversed (so additional reverse step would be needed in runtime to fix that).
 // Hence, a bit verbose, but works:
+gen_tuple_conversion!(
+    0: R0 => C0);
 gen_tuple_conversion!(
     0: R0 => C0, 1: R1 => C1);
 gen_tuple_conversion!(
@@ -1331,6 +1331,13 @@ mod test {
         let tuple = (1, "foo");
         let v = Value::from(tuple);
         assert_eq!(v, Value::list(vec![Value::bigint(1), Value::string("foo")]))
+    }
+
+    #[test]
+    fn convert_single_item_tuple_into_value() {
+        let tuple = (1,);
+        let v = Value::from(tuple);
+        assert_eq!(v, Value::list(vec![Value::bigint(1)]))
     }
 
     #[test]
